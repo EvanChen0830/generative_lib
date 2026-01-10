@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import os
 import copy
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 from .logger import Logger
 
 class ModelTracker:
@@ -32,7 +32,8 @@ class ModelTracker:
         model: nn.Module,
         optimizer: torch.optim.Optimizer,
         epoch: int,
-        metric_val: float
+        metric_val: float,
+        run_id: Optional[str] = None
     ):
         """Saves 'last.pt' and optionally 'best.pt'."""
         
@@ -40,7 +41,8 @@ class ModelTracker:
             "epoch": epoch,
             "model_state": model.state_dict(),
             "optimizer_state": optimizer.state_dict(),
-            "metric": metric_val
+            "metric": metric_val,
+            "run_id": run_id
         }
         
         # Save Last
@@ -60,28 +62,19 @@ class ModelTracker:
             self.best_score = metric_val
             best_path = os.path.join(self.save_dir, "best.pt")
             torch.save(state, best_path)
-            # print(f"New best model saved at epoch {epoch} with {self.best_metric}={metric_val:.4f}")
 
-    def load_best_valid(self, model: nn.Module) -> nn.Module:
-        """Loads weights from best.pt."""
-        path = os.path.join(self.save_dir, "best.pt")
+    def load_last(self, model: nn.Module, optimizer: Optional[torch.optim.Optimizer] = None) -> Dict[str, Any]:
+        """Loads weights from last.pt and returns state info."""
+        path = os.path.join(self.save_dir, "last.pt")
         if not os.path.exists(path):
-            print(f"Warning: {path} not found. Returning current model.")
-            return model
+            print(f"Warning: {path} not found. Returning empty state.")
+            return {}
             
         checkpoint = torch.load(path, map_location=next(model.parameters()).device)
         model.load_state_dict(checkpoint["model_state"])
-        print(f"Loaded best model from {path} (Epoch {checkpoint['epoch']})")
-        return model
-
-    def load_last(self, model: nn.Module) -> nn.Module:
-        """Loads weights from last.pt."""
-        path = os.path.join(self.save_dir, "last.pt")
-        if not os.path.exists(path):
-            print(f"Warning: {path} not found. Returning current model.")
-            return model
-
-        checkpoint = torch.load(path, map_location=next(model.parameters()).device)
-        model.load_state_dict(checkpoint["model_state"])
+        
+        if optimizer and "optimizer_state" in checkpoint:
+            optimizer.load_state_dict(checkpoint["optimizer_state"])
+            
         print(f"Loaded last model from {path} (Epoch {checkpoint['epoch']})")
-        return model
+        return checkpoint

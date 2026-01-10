@@ -81,7 +81,7 @@ class BaseFlowMatchingSampler(BaseSampler):
         dt = 1.0 / self.steps
         time_seq = torch.linspace(0, 1, self.steps + 1)[:-1]
         
-        for i, t_curr in enumerate(time_seq):
+        for i, t_curr in enumerate(tqdm(time_seq, desc="Flow Steps", leave=False)):
             t_curr_scalar = t_curr.item()
             v_pred = self.method.predict(self.model, x_t, float(t_curr_scalar), condition)
             x_t = x_t + v_pred * dt

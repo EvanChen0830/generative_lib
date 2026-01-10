@@ -10,11 +10,13 @@ class Logger:
         run_name: str,
         mlflow_uri: Optional[str] = None,
         log_dir: str = "./logs",
-        use_mlflow: bool = True
+        use_mlflow: bool = True,
+        run_id: Optional[str] = None
     ):
         self.use_mlflow = use_mlflow
         self.log_dir = log_dir
         os.makedirs(log_dir, exist_ok=True)
+        self.run_id = run_id
         
         if self.use_mlflow:
             import mlflow
@@ -22,7 +24,15 @@ class Logger:
                 mlflow.set_tracking_uri(mlflow_uri)
             
             mlflow.set_experiment(project_name)
-            mlflow.start_run(run_name=run_name)
+            
+            if run_id:
+                # Resume existing run
+                mlflow.start_run(run_id=run_id)
+            else:
+                # Start new run
+                run = mlflow.start_run(run_name=run_name)
+                self.run_id = run.info.run_id
+                
             self.mlflow = mlflow
     
     def log_metrics(self, metrics: Dict[str, float], step: int):

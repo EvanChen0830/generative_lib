@@ -69,14 +69,17 @@ class GaussianDiffusion(BaseMethod):
         
         # 4. Compute Loss
         if self.prediction_type == "epsilon":
+            # Target is noise
             target = noise
         elif self.prediction_type == "sample":
+            # Target is x_0
             target = x
-        else:
-             raise NotImplementedError(f"Pred type {self.prediction_type} not supp")
-
+        elif self.prediction_type == "v_prediction":
+            # Target is v
+            # v = alpha * eps - sigma * x
+            target = sqrt_alpha_t * noise - sqrt_one_minus_alpha_t * x
+            
         loss = torch.nn.functional.mse_loss(pred_noise, target)
-        
         return {"loss": loss}
 
     def get_snr(self, t: torch.Tensor) -> torch.Tensor:

@@ -1,6 +1,7 @@
 torch>=2.0.0
 numpy
 mlflow
+protobuf<=3.20.3
 tqdm
 matplotlib
 scikit-learn

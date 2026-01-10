@@ -44,11 +44,22 @@ class BaseTrainer(ABC):
         self.use_ema = use_ema
         self.grad_clip = grad_clip
         
-    def fit(self, train_loader: DataLoader, val_loader: Optional[DataLoader] = None, epochs: int = 100):
+    def fit(self, train_loader: DataLoader, val_loader: Optional[DataLoader] = None, epochs: int = 100, resume: bool = False):
         """Main training loop."""
-        print(f"Starting training on {self.device} for {epochs} epochs.")
+        start_epoch = 1
         
-        for epoch in range(1, epochs + 1):
+        # Resume Logic
+        if resume and self.tracker:
+            checkpoint = self.tracker.load_last(self.model, self.optimizer)
+            if checkpoint:
+                start_epoch = checkpoint.get("epoch", 0) + 1
+                run_id = checkpoint.get("run_id")
+                # If tracker has a logger, we update its run_id if not already set?
+                # Actually, Logger init handles run_id. If we resume, we should have passed run_id to Logger init?
+                
+        print(f"Starting training on {self.device} from epoch {start_epoch} to {epochs}.")
+        
+        for epoch in range(start_epoch, epochs + 1):
             train_metrics = self._train_epoch(train_loader, epoch)
             
             # Log training metrics
@@ -72,7 +83,9 @@ class BaseTrainer(ABC):
             if self.tracker:
                 # We save based on the first metric in val_metrics if available, otherwise 'loss'
                 metric_val = val_metrics.get("loss", train_metrics.get("loss", 0.0))
-                self.tracker.save_checkpoint(self.model, self.optimizer, epoch, metric_val)
+                # Get run_id from Logger if exists
+                run_id = self.tracker.logger.run_id if (self.tracker.logger and hasattr(self.tracker.logger, 'run_id')) else None
+                self.tracker.save_checkpoint(self.model, self.optimizer, epoch, metric_val, run_id)
 
     def _process_batch(self, batch: Dict[str, Any]) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Extracts features and labels from batch."""
@@ -110,7 +123,10 @@ class BaseTrainer(ABC):
     def _train_epoch(self, loader: DataLoader, epoch: int) -> Dict[str, float]:
         """Runs one epoch of training."""
         self.model.train()
-        total_loss = 0.0
+        
+        # Accumulators for all metric keys
+        # We don't know keys ahead of time, so use dict
+        total_metrics = {}
         count = 0
         
         pbar = tqdm(loader, desc=f"Epoch {epoch} Train", leave=False)
@@ -124,27 +140,36 @@ class BaseTrainer(ABC):
             
             # Compute Loss via Method (Physics)
             loss_dict = self.method.compute_loss(self.model, x, cond)
-            loss = loss_dict["loss"]
             
-            loss.backward()
+            # backward on "loss" key (convention) OR sum of all? 
+            if "loss" in loss_dict:
+                final_loss = loss_dict["loss"]
+            else:
+                final_loss = sum(loss_dict.values())
+                loss_dict["loss"] = final_loss # Record total
+            
+            final_loss.backward()
             
             if self.grad_clip > 0:
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_clip)
                 
             self.optimizer.step()
             
-            total_loss += loss.item()
+            # Accumulate
             count += 1
-            
-            # Update progress bar
-            pbar.set_postfix({"loss": loss.item()})
+            for k, v in loss_dict.items():
+                if k not in total_metrics: total_metrics[k] = 0.0
+                total_metrics[k] += v.item()
 
-        return {"loss": total_loss / count}
+            # Update progress bar
+            pbar.set_postfix({"loss": final_loss.item()})
+            
+        return {k: v / count for k, v in total_metrics.items()}
 
     def _validate(self, loader: DataLoader, epoch: int) -> Dict[str, float]:
         """Runs validation."""
         self.model.eval()
-        total_loss = 0.0
+        total_metrics = {}
         count = 0
         
         with torch.no_grad():
@@ -152,7 +177,14 @@ class BaseTrainer(ABC):
                 x, cond = self._process_batch(batch)
 
                 loss_dict = self.method.compute_loss(self.model, x, cond)
-                total_loss += loss_dict["loss"].item()
-                count += 1
                 
-        return {"loss": total_loss / count}
+                # Ensure 'loss' key exists for consistency
+                if "loss" not in loss_dict:
+                    loss_dict["loss"] = sum(loss_dict.values())
+                    
+                count += 1
+                for k, v in loss_dict.items():
+                    if k not in total_metrics: total_metrics[k] = 0.0
+                    total_metrics[k] += v.item()
+                
+        return {k: v / count for k, v in total_metrics.items()}

@@ -9,6 +9,7 @@ from generative_lib.diffusion.method.gaussian_diffusion import GaussianDiffusion
 from generative_lib.diffusion.trainer.base import BaseDiffusionTrainer
 from generative_lib.diffusion.sampler.base import BaseDiffusionSampler
 from generative_lib.utils.logger import Logger
+from generative_lib.utils.tracker import ModelTracker
 
 # 1. Define User Model with Time Embeddings
 class SinusoidalPosEmb(nn.Module):
@@ -102,7 +103,21 @@ def main():
     method = GaussianDiffusion(timesteps=1000, schedule="linear")
     
     # Logger
-    logger = Logger(project_name="TwoMoons", run_name="Diffusion_Cond_20k", use_mlflow=False)
+    # Use local file backend in examples/mlruns/
+    logger = Logger(
+        project_name="TwoMoons", 
+        run_name="Diffusion_MLflow_Check", 
+        use_mlflow=True, 
+        mlflow_uri="file:./examples/mlruns"
+    )
+
+    # Tracker (Connects Logger to Trainer)
+    tracker = ModelTracker(
+        exp_name="TwoMoons", 
+        model_name="Diff", 
+        save_dir="./checkpoints/two_moons_diff", 
+        logger=logger
+    )
     
     # Trainer
     # feature_keys -> x (Target/Data to generate) -> "position"
@@ -114,7 +129,7 @@ def main():
         feature_keys=["position"],
         label_keys=["class"], 
         device=device,
-        tracker=None
+        tracker=tracker
     )
     
     # 4. Train

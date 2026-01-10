@@ -86,7 +86,8 @@ class BaseDiffusionSampler(BaseSampler):
         time_seq = list(reversed(range(0, self.method.timesteps, self.method.timesteps // self.steps)))
         time_seq = time_seq[:self.steps]
         
-        for i, t_idx in enumerate(time_seq):
+        # Nested TQDM for time steps (leave=False to avoid clutter)
+        for i, t_idx in enumerate(tqdm(time_seq, desc="Diffusion Steps", leave=False)):
             prev_t_idx = t_idx - (self.method.timesteps // self.steps)
             if prev_t_idx < 0: prev_t_idx = -1 
             
