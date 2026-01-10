@@ -16,13 +16,13 @@
 
 Enhance the generation quality and controllability for diffusion models.
 
-- [ ] **DDIM (Denoising Diffusion Implicit Models)**:
-  - [ ] Implement `DDIMSampler` (deterministic, fewer steps).
-  - [ ] Inversion capabilities.
-- [ ] **Classifier-Free Guidance (CFG)**:
-  - [ ] Update `BaseDiffusionSampler` (or new `CFGSampler`) to handle `guidance_scale`.
-  - [ ] Modify training to support unconditional training (null token/masking).
-  - [ ] Verify on Two Moons (Conditional).
+- [x] **DDIM (Denoising Diffusion Implicit Models)**:
+  - [x] Implement `DDIMSampler` (Unified in `BaseDiffusionSampler`).
+  - [x] Inversion capabilities.
+- [x] **Classifier-Free Guidance (CFG)**:
+  - [x] Unified `BaseDiffusionSampler` to handle `guidance_scale`.
+  - [x] Dual-Loss Training via `CFGDiffusion`.
+  - [x] Verified on Two Moons (Conditional).
 
 ## ⚡ Priority 3: Flow Matching Enhancements
 
