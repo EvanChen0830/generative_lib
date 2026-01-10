@@ -1,0 +1,7 @@
+torch>=2.0.0
+numpy
+mlflow
+tqdm
+matplotlib
+scikit-learn
+pytest
