@@ -30,14 +30,14 @@ Enhance the generation quality and controllability for diffusion models.
 
 Push the state-of-the-art in Flow Matching.
 
-- [ ] **Conditional Flow Matching (CFM)**:
-  - [ ] Ensure explicit support for class-conditional vector fields.
-- [ ] **Optimal Transport (OT)**:
-  - [ ] Implement OT-Plan for cleaner couplings between noise and data.
-  - [ ] Reduces curvature -> faster sampling.
-- [ ] **Rectified Flow**:
-  - [ ] Implement Reflow procedure (training on generated data-noise pairs) to straighten trajectories further.
-  - [ ] 1-Rectified Flow, 2-Rectified Flow.
+- [x] **Conditional Flow Matching (CFM)**:
+  - [x] Ensure explicit support for class-conditional vector fields.
+- [x] **Optimal Transport (OT)**:
+  - [x] Implement OT-Plan for cleaner couplings between noise and data.
+  - [x] Reduces curvature -> faster sampling.
+- [x] **Rectified Flow**:
+  - [x] Implement Reflow procedure (training on generated data-noise pairs) to straighten trajectories further.
+  - [x] 1-Rectified Flow, 2-Rectified Flow.
 
 ## 🔄 Priority 4: Consistency Models
 
