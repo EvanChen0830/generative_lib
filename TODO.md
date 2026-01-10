@@ -1,37 +1,59 @@
 # Project Roadmap & TODOs
 
-## 🔥 Priority 1: Evaluation & Metrics
+## 🔥 Priority 1: Evaluation & Metrics (Completed)
 
-A standardized evaluation framework is critical for comparing generative models objectively.
+**Branch**: `develop` -> `main`
 
 - [x] **`BaseEvaluator` Class**:
-  - [x] Standalone usage: `evaluator = Evaluator(logger=mlflow_logger)`
-  - [x] Interface details: `metrics = evaluator.evaluate(generated_data, dataloader)`
-  - [x] Logic: Internally iterates `dataloader` to collect ground truth and compares with `generated_data`.
-  - [x] Auto-logging to MLflow.
-- [x] **Metric Implementations**:
-  - [x] **FID (Fréchet Inception Distance)**: For image quality/diversity.
-  - [ ] **Recall/Precision**: For mode coverage.
-  - [ ] **Log-Likelihood (NLL)**: Essential for determining exact density estimation quality.
+  - [x] Standalone `Evaluator(logger=...)`.
+  - [x] Interface `evaluate(generated_data, dataloader)`.
+  - [x] FID Metric Logic.
+  - [x] MLflow Integration.
 
 ## 🚀 Priority 2: Advanced Sampling & Guidance
 
-Enhance the generation quality and controllability.
+**Branch**: `feat/diffusion`
+
+Enhance the generation quality and controllability for diffusion models.
 
 - [ ] **DDIM (Denoising Diffusion Implicit Models)**:
-  - [ ] Deterministic sampling.
-  - [ ] Faster generation (fewer steps).
-  - [ ] Inversion capabilities for image editing.
+  - [ ] Implement `DDIMSampler` (deterministic, fewer steps).
+  - [ ] Inversion capabilities.
 - [ ] **Classifier-Free Guidance (CFG)**:
-  - [ ] Implement training support (randomly dropping conditions).
-  - [ ] Update `BaseSampler` to handle guidance scale `w` during inference: $\epsilon_{pred} = \epsilon_{uncond} + w (\epsilon_{cond} - \epsilon_{uncond})$.
+  - [ ] Update `BaseDiffusionSampler` (or new `CFGSampler`) to handle `guidance_scale`.
+  - [ ] Modify training to support unconditional training (null token/masking).
+  - [ ] Verify on Two Moons (Conditional).
 
-## ⚡ Priority 3: Optimal Transport & Flow Improvements
+## ⚡ Priority 3: Flow Matching Enhancements
+
+**Branch**: `feat/flow_matching`
 
 Push the state-of-the-art in Flow Matching.
 
-- [ ] **Optimal Transport (OT) Condtional Flow Matching**:
-  - [ ] Implement OT-based coupling (linear interpolation between data and noise with minimal cost).
-  - [ ] Reduces transport cost -> straighter flow paths -> faster/better ODE solving.
-- [ ] **Solver Choices**:
-  - [ ] Support higher-order ODE solvers (Runge-Kutta 4) in the sampler for better precision with fewer regular steps.
+- [ ] **Conditional Flow Matching (CFM)**:
+  - [ ] Ensure explicit support for class-conditional vector fields.
+- [ ] **Optimal Transport (OT)**:
+  - [ ] Implement OT-Plan for cleaner couplings between noise and data.
+  - [ ] Reduces curvature -> faster sampling.
+- [ ] **Rectified Flow**:
+  - [ ] Implement Reflow procedure (training on generated data-noise pairs) to straighten trajectories further.
+  - [ ] 1-Rectified Flow, 2-Rectified Flow.
+
+## 🔄 Priority 4: Consistency Models
+
+**Branch**: `feat/consistency`
+
+Fast one-step or few-step generation.
+
+- [ ] **Consistency Training (CT)**:
+  - [ ] Implement Consistency Loss (enforcing $f(x_t, t) = f(x_{t'}, t')$).
+  - [ ] Support searching for optimal time discretization.
+- [ ] **Consistency Distillation (CD)**:
+  - [ ] Distill a pre-trained Diffusion model into a Consistency Model.
+
+## 📦 Priority 5: Solvers & Architecture
+
+**Branch**: `develop` (or specific feature branch if large)
+
+- [ ] **Solver Choices**: Runge-Kutta 4, Euler, Heun.
+- [ ] **Architectures**: U-Net 1D/2D, DiT.
