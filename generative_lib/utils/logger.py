@@ -35,10 +35,10 @@ class Logger:
                 
             self.mlflow = mlflow
     
-    def log_metrics(self, metrics: Dict[str, float], step: int):
+    def log_metrics(self, metrics: Dict[str, float], step: Optional[int] = None):
         """Logs scalar metrics."""
         if self.use_mlflow:
-            self.mlflow.log_metrics(metrics, step=step)
+            self.mlflow.log_metrics(metrics, step=step or 0)
 
     def log_params(self, params: Dict[str, Any]):
         """Logs hyperparameters."""
