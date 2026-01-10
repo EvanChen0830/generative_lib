@@ -62,4 +62,4 @@ class FlowMatching(BaseMethod):
     def get_snr(self, t: torch.Tensor) -> torch.Tensor:
         """SNR not typically defined for FM in same way as Diffusion."""
         return torch.ones_like(t) # Placeholder
-```
+        return torch.ones_like(t) # Placeholder
