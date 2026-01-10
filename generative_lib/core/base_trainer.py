@@ -33,7 +33,7 @@ class BaseTrainer(ABC):
         use_ema: bool = False,
         grad_clip: float = 1.0,
     ):
-        self.method = method
+        self.method = method.to(device)
         self.model = model.to(device)
         self.optimizer = optimizer
         self.feature_keys = feature_keys
