@@ -4,12 +4,15 @@
 
 A standardized evaluation framework is critical for comparing generative models objectively.
 
-- [ ] **`BaseEvaluator` Class**: Abstract base for evaluation pipelines.
-- [ ] **Metric Implementations**:
-  - [ ] **FID (Fréchet Inception Distance)**: For image quality/diversity.
+- [x] **`BaseEvaluator` Class**:
+  - [x] Standalone usage: `evaluator = Evaluator(logger=mlflow_logger)`
+  - [x] Interface details: `metrics = evaluator.evaluate(generated_data, dataloader)`
+  - [x] Logic: Internally iterates `dataloader` to collect ground truth and compares with `generated_data`.
+  - [x] Auto-logging to MLflow.
+- [x] **Metric Implementations**:
+  - [x] **FID (Fréchet Inception Distance)**: For image quality/diversity.
   - [ ] **Recall/Precision**: For mode coverage.
-  - [ ] **Log-Likelihood (NLL)**: Essential for determining exact density estimation quality (especially for Flow Matching).
-- [ ] **Integration**: Hook into `BaseTrainer.validate()` to log these metrics to MLflow automatically.
+  - [ ] **Log-Likelihood (NLL)**: Essential for determining exact density estimation quality.
 
 ## 🚀 Priority 2: Advanced Sampling & Guidance
 
