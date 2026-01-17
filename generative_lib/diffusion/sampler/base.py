@@ -17,13 +17,17 @@ class BaseDiffusionSampler(BaseSampler):
         label_keys: Optional[List[str]] = None,
         sampler_type: str = "ddpm", # 'ddpm' or 'ddim'
         guidance_scale: float = 1.0,
-        unconditional_value: float = 0.0
+        unconditional_value: float = 0.0,
+        bad_model: Optional[torch.nn.Module] = None,
+        bad_guidance_scale: float = 0.0,
     ):
         super().__init__(method, model, device, label_keys=label_keys)
         self.steps = steps
         self.sampler_type = sampler_type
         self.guidance_scale = guidance_scale
         self.unconditional_value = unconditional_value
+        self.bad_model = bad_model
+        self.bad_guidance_scale = bad_guidance_scale
         
     def sample(
         self, 
@@ -114,7 +118,23 @@ class BaseDiffusionSampler(BaseSampler):
             t_float = t_idx / self.method.timesteps
             
             # Predict Noise
-            if self.guidance_scale != 1.0 and condition is not None:
+            # Predict Noise
+            if self.bad_model is not None and self.bad_guidance_scale != 0.0:
+                 # Self-Guidance: Guided by Bad Version
+                 # pred = pred_good + scale * (pred_good - pred_bad)
+                 
+                 # We need to run both models.
+                 # Optimization: Run them in parallel if possible? Python sequential for now.
+                 
+                 # 1. Good Model
+                 pred_good = self.method.predict(self.model, x_t, t_float, condition)
+                 
+                 # 2. Bad Model
+                 pred_bad = self.method.predict(self.bad_model, x_t, t_float, condition)
+                 
+                 pred_noise = pred_good + self.bad_guidance_scale * (pred_good - pred_bad)
+
+            elif self.guidance_scale != 1.0 and condition is not None:
                 # CFG: Run Conditioned and Unconditioned
                 # We do this by concatenating batch to avoid 2 forward passes overhead if possible
                 # But here we call method.predict which might expect specific batch sizes.

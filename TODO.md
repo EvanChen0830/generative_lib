@@ -45,11 +45,11 @@ Push the state-of-the-art in Flow Matching.
 
 Fast one-step or few-step generation.
 
-- [ ] **Consistency Training (CT)**:
-  - [ ] Implement Consistency Loss (enforcing $f(x_t, t) = f(x_{t'}, t')$).
-  - [ ] Support searching for optimal time discretization.
-- [ ] **Consistency Distillation (CD)**:
-  - [ ] Distill a pre-trained Diffusion model into a Consistency Model.
+- [x] **Consistency Training (CT)**:
+  - [x] Implement Consistency Loss (enforcing $f(x_t, t) = f(x_{t'}, t')$).
+  - [x] Support searching for optimal time discretization.
+- [x] **Consistency Distillation (CD)**:
+  - [x] Distill a pre-trained Diffusion model into a Consistency Model.
 
 ## 📦 Priority 5: Solvers & Architecture
 
