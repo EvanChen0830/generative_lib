@@ -90,20 +90,21 @@ class BaseTrainer(ABC):
     def _process_batch(self, batch: Dict[str, Any]) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Extracts features and labels from batch."""
         # Extract Features
-        feats = []
+        # feats = []
+        cond = []
         for k in self.feature_keys:
             if k in batch:
-                feats.append(batch[k].to(self.device))
+                cond.append(batch[k].to(self.device))
             else:
                 raise ValueError(f"Feature key '{k}' not found in batch keys: {list(batch.keys())}")
         
-        if len(feats) > 1:
-            x = torch.cat(feats, dim=-1)
+        if len(cond) > 1:
+            x = torch.cat(cond, dim=-1)
         else:
-            x = feats[0]
+            x = cond[0]
 
-        # Extract Labels (Condition)
-        cond = None
+        # Extract Labels (x)
+        x = None
         if self.label_keys:
             labels = []
             for k in self.label_keys:
@@ -114,9 +115,9 @@ class BaseTrainer(ABC):
             
             if labels:
                 if len(labels) > 1:
-                    cond = torch.cat(labels, dim=-1)
+                    x = torch.cat(labels, dim=-1)
                 else:
-                    cond = labels[0]
+                    x = labels[0]
         
         return x, cond
 
