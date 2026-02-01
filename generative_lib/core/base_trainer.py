@@ -91,17 +91,18 @@ class BaseTrainer(ABC):
         """Extracts features and labels from batch."""
         # Extract Features
         # feats = []
+        # print(batch)
         cond = []
         for k in self.feature_keys:
             if k in batch:
                 cond.append(batch[k].to(self.device))
             else:
                 raise ValueError(f"Feature key '{k}' not found in batch keys: {list(batch.keys())}")
-        
+        # print(len(cond))
         if len(cond) > 1:
-            x = torch.cat(cond, dim=-1)
+            cond = torch.cat(cond, dim=-1)
         else:
-            x = cond[0]
+            cond = cond[0]
 
         # Extract Labels (x)
         x = None
@@ -112,13 +113,16 @@ class BaseTrainer(ABC):
                     val = batch[k].to(self.device)
                     # Create mask for NaNs if necessary, or just assume valid data
                     labels.append(val)
+                else:
+                    raise ValueError(f"Label key '{k}' not found in batch keys: {list(batch.keys())}")
+        
             
             if labels:
                 if len(labels) > 1:
                     x = torch.cat(labels, dim=-1)
                 else:
                     x = labels[0]
-        
+        # print(x, cond)
         return x, cond
 
     def _train_epoch(self, loader: DataLoader, epoch: int) -> Dict[str, float]:
