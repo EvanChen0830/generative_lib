@@ -8,8 +8,8 @@ from ...core.base_method import BaseMethod
 class BaseDiffusionSampler(BaseSampler):
     """Sampler for Gaussian Diffusion models."""
 
-    def __init__(self, method: BaseMethod, model: torch.nn.Module, device: str, steps: int = 50, label_keys: Optional[List[str]] = None):
-        super().__init__(method, model, device, label_keys=label_keys)
+    def __init__(self, method: BaseMethod, model: torch.nn.Module, device: str, steps: int = 50, feature_keys: Optional[List[str]] = None):
+        super().__init__(method, model, device, feature_keys=feature_keys)
         self.steps = steps
         
     def sample(
