@@ -70,7 +70,8 @@ class BaseDiffusionSampler(BaseSampler):
                 cond_expanded = None
             
             total_items = current_bs * num_samples
-            samples_flat = self._sample_batch(total_items, shape, cond_expanded)
+            with torch.no_grad():
+                samples_flat = self._sample_batch(total_items, shape, cond_expanded)
             
             final_shape = (current_bs, num_samples, *shape)
             samples_batch = samples_flat.view(final_shape)
