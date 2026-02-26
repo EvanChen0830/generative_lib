@@ -90,20 +90,22 @@ class BaseTrainer(ABC):
     def _process_batch(self, batch: Dict[str, Any]) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Extracts features and labels from batch."""
         # Extract Features
-        feats = []
+        # feats = []
+        # print(batch)
+        cond = []
         for k in self.feature_keys:
             if k in batch:
-                feats.append(batch[k].to(self.device))
+                cond.append(batch[k].to(self.device))
             else:
                 raise ValueError(f"Feature key '{k}' not found in batch keys: {list(batch.keys())}")
-        
-        if len(feats) > 1:
-            x = torch.cat(feats, dim=-1)
+        # print(len(cond))
+        if len(cond) > 1:
+            cond = torch.cat(cond, dim=-1)
         else:
-            x = feats[0]
+            cond = cond[0]
 
-        # Extract Labels (Condition)
-        cond = None
+        # Extract Labels (x)
+        x = None
         if self.label_keys:
             labels = []
             for k in self.label_keys:
@@ -111,13 +113,16 @@ class BaseTrainer(ABC):
                     val = batch[k].to(self.device)
                     # Create mask for NaNs if necessary, or just assume valid data
                     labels.append(val)
+                else:
+                    raise ValueError(f"Label key '{k}' not found in batch keys: {list(batch.keys())}")
+        
             
             if labels:
                 if len(labels) > 1:
-                    cond = torch.cat(labels, dim=-1)
+                    x = torch.cat(labels, dim=-1)
                 else:
-                    cond = labels[0]
-        
+                    x = labels[0]
+        # print(x, cond)
         return x, cond
 
     def _train_epoch(self, loader: DataLoader, epoch: int) -> Dict[str, float]:

@@ -73,8 +73,18 @@ class ModelTracker:
         checkpoint = torch.load(path, map_location=next(model.parameters()).device)
         model.load_state_dict(checkpoint["model_state"])
         
-        if optimizer and "optimizer_state" in checkpoint:
-            optimizer.load_state_dict(checkpoint["optimizer_state"])
-            
         print(f"Loaded last model from {path} (Epoch {checkpoint['epoch']})")
+        return checkpoint
+
+    def load_best(self, model: nn.Module) -> Dict[str, Any]:
+        """Loads weights from best.pt and returns state info."""
+        path = os.path.join(self.save_dir, "best.pt")
+        if not os.path.exists(path):
+            print(f"Warning: {path} not found. Returning empty state.")
+            return {}
+            
+        checkpoint = torch.load(path, map_location=next(model.parameters()).device)
+        model.load_state_dict(checkpoint["model_state"])
+        
+        print(f"Loaded best model from {path} (Epoch {checkpoint['epoch']})")
         return checkpoint

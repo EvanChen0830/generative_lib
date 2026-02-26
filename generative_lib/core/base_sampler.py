@@ -16,18 +16,18 @@ class BaseSampler(ABC):
         method: BaseMethod,
         model: nn.Module,
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
-        label_keys: Optional[List[str]] = None,
+        feature_keys: Optional[List[str]] = None,
     ):
         self.method = method
         self.model = model
         self.device = device
-        self.label_keys = label_keys
+        self.feature_keys = feature_keys
         self.model.to(self.device)
         self.model.eval()
 
     def _extract_condition(self, batch: Any) -> Optional[torch.Tensor]:
-        """Helper to extract condition from batch using label_keys."""
-        if not self.label_keys:
+        """Helper to extract condition from batch using feature_keys."""
+        if not self.feature_keys:
             if isinstance(batch, torch.Tensor):
                 return batch.to(self.device)
             return None
@@ -36,7 +36,7 @@ class BaseSampler(ABC):
              return None
 
         conds = []
-        for k in self.label_keys:
+        for k in self.feature_keys:
             if k in batch:
                 conds.append(batch[k].to(self.device))
         

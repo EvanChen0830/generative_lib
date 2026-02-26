@@ -15,11 +15,12 @@ class BaseDiffusionSampler(BaseSampler):
         device: str, 
         steps: int = 50, 
         label_keys: Optional[List[str]] = None,
+        feature_keys: Optional[List[str]] = None,
         sampler_type: str = "ddpm", # 'ddpm' or 'ddim'
         guidance_scale: float = 1.0,
         unconditional_value: float = 0.0
     ):
-        super().__init__(method, model, device, label_keys=label_keys)
+        super().__init__(method, model, device, label_keys=label_keys, feature_keys=feature_keys)
         self.steps = steps
         self.sampler_type = sampler_type
         self.guidance_scale = guidance_scale
@@ -82,7 +83,8 @@ class BaseDiffusionSampler(BaseSampler):
                 cond_expanded = None
             
             total_items = current_bs * num_samples
-            samples_flat = self._sample_batch(total_items, shape, cond_expanded)
+            with torch.no_grad():
+                samples_flat = self._sample_batch(total_items, shape, cond_expanded)
             
             final_shape = (current_bs, num_samples, *shape)
             samples_batch = samples_flat.view(final_shape)
