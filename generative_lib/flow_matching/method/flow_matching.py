@@ -55,11 +55,9 @@ class FlowMatching(BaseMethod):
         
         # 4. Compute Loss
         # Target v = x1 - (1 - sigma_min) x0
-        target = x - (1 - self.sigma_min) * x0
+        target = x - (1 - self.sigma_min) * x_0
         loss = torch.nn.functional.mse_loss(v_pred, target)
         return {"loss": loss}
 
     def get_snr(self, t: torch.Tensor) -> torch.Tensor:
         """SNR not typically defined for FM in same way as Diffusion."""
-        return torch.ones_like(t) # Placeholder
-```

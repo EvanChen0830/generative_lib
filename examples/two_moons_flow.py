@@ -9,6 +9,7 @@ from generative_lib.flow_matching.method.flow_matching import FlowMatching
 from generative_lib.flow_matching.trainer.base import BaseFlowMatchingTrainer
 from generative_lib.flow_matching.sampler.base import BaseFlowMatchingSampler
 from generative_lib.utils.logger import Logger
+from generative_lib.metrics.distance import calculate_frechet_distance, compute_statistics
 
 class SimpleMLP(nn.Module):
     def __init__(self, in_features=2, hidden_features=64):
@@ -50,14 +51,14 @@ def main():
         method=method,
         model=model,
         optimizer=optimizer,
-        feature_keys=["features"],
-        label_keys=[], 
+        feature_keys=[],
+        label_keys=["features"], 
         device=device
     )
     
     # 4. Train
-    print("Training Flow Matching (20k samples, 100 epochs)...")
-    trainer.fit(train_loader, epochs=100)
+    print("Training Flow Matching (20k samples, 200 epochs)...")
+    trainer.fit(train_loader, epochs=200)
     
     # 5. Sample
     print("Sampling...")
@@ -74,6 +75,12 @@ def main():
     # 6. Verify
     samples_np = samples.detach().cpu().numpy()
     
+    print("Computing metrics...")
+    mu_real, sig_real = compute_statistics(X)
+    mu_gen, sig_gen = compute_statistics(samples_np)
+    fd_flow = calculate_frechet_distance(mu_real, sig_real, mu_gen, sig_gen)
+    print(f"FD Flow Matching: {fd_flow:.4f}")
+    
     # Plot results
     # Downsample Data for plot clarity
     X_plot = X[:2000]
@@ -82,7 +89,7 @@ def main():
     plt.scatter(X_plot[:, 0], X_plot[:, 1], alpha=0.3, label="Data", s=10)
     plt.scatter(samples_np[:, 0], samples_np[:, 1], alpha=0.8, label="Generated")
     plt.legend()
-    plt.title("Two Moons - Flow Matching (20k Data, 100 Epochs)")
+    plt.title(f"Two Moons - Flow Matching (20k Data, 200 Epochs)\nFD: {fd_flow:.4f}")
     plt.savefig("examples/two_moons_flow.png")
     print("Saved plot to examples/two_moons_flow.png")
 

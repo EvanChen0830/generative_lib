@@ -12,6 +12,7 @@ from generative_lib.diffusion.trainer.base import BaseDiffusionTrainer
 from generative_lib.diffusion.sampler.base import BaseDiffusionSampler
 from generative_lib.utils.logger import Logger
 from generative_lib.utils.tracker import ModelTracker
+from generative_lib.metrics.distance import calculate_frechet_distance, compute_statistics
 
 # 1. Model Definition
 class SinusoidalPosEmb(nn.Module):
@@ -49,7 +50,6 @@ class SimpleMLP(nn.Module):
         if t.dtype == torch.float: t = (t * 1000).long().clamp(0, 999)
         elif t.ndim == 2: t = t.squeeze(-1).long()
         t_emb = self.time_mlp(t)
-        if condition is None: condition = torch.zeros(x.shape[0], 1, device=x.device)
         inp = torch.cat([x, condition, t_emb], dim=-1)
         return self.net(inp)
 
@@ -86,15 +86,15 @@ def main():
         method=method,
         model=model,
         optimizer=optimizer,
-        feature_keys=["position"],
-        label_keys=["class"], 
+        feature_keys=["class"],
+        label_keys=["position"], 
         device=device,
         tracker=tracker
     )
     
     # 4. Train
     print("Training CFG Diffusion (Dual Loss)...")
-    trainer.fit(train_loader, epochs=50) # 50 epochs for speed
+    trainer.fit(train_loader, epochs=200) # 200 epochs
     
     # 5. Sampling
     print("Sampling Comparison...")
@@ -105,31 +105,45 @@ def main():
     
     # Sampler 1: DDPM (Standard)
     # w=1.0 means cond only (no guidance)
-    sampler_ddpm = BaseDiffusionSampler(method, model, device, steps=50, sampler_type="ddpm", guidance_scale=1.0, label_keys=["class"])
+    sampler_ddpm = BaseDiffusionSampler(method, model, device, steps=50, sampler_type="ddpm", guidance_scale=1.0, feature_keys=["class"])
     s_ddpm = sampler_ddpm.sample(num_samples=1, shape=[2], condition=cond).squeeze(1).detach().cpu().numpy()
     
     # Sampler 2: DDIM (Deterministic) w=1.0
-    sampler_ddim = BaseDiffusionSampler(method, model, device, steps=50, sampler_type="ddim", guidance_scale=1.0, label_keys=["class"])
+    sampler_ddim = BaseDiffusionSampler(method, model, device, steps=50, sampler_type="ddim", guidance_scale=1.0, feature_keys=["class"])
     s_ddim = sampler_ddim.sample(num_samples=1, shape=[2], condition=cond).squeeze(1).detach().cpu().numpy()
     
     # Sampler 3: DDIM with CFG w=3.0
-    sampler_cfg = BaseDiffusionSampler(method, model, device, steps=50, sampler_type="ddim", guidance_scale=3.0, unconditional_value=-1.0, label_keys=["class"])
+    sampler_cfg = BaseDiffusionSampler(method, model, device, steps=50, sampler_type="ddim", guidance_scale=3.0, unconditional_value=-1.0, feature_keys=["class"])
     s_cfg = sampler_cfg.sample(num_samples=1, shape=[2], condition=cond).squeeze(1).detach().cpu().numpy()
+    
+    print("Computing metrics...")
+    mu_real, sig_real = compute_statistics(X_norm)
+    mu_ddpm, sig_ddpm = compute_statistics(s_ddpm)
+    fd_ddpm = calculate_frechet_distance(mu_real, sig_real, mu_ddpm, sig_ddpm)
+    print(f"FD DDPM (w=1.0): {fd_ddpm:.4f}")
+    
+    mu_ddim, sig_ddim = compute_statistics(s_ddim)
+    fd_ddim = calculate_frechet_distance(mu_real, sig_real, mu_ddim, sig_ddim)
+    print(f"FD DDIM (w=1.0): {fd_ddim:.4f}")
+    
+    mu_cfg, sig_cfg = compute_statistics(s_cfg)
+    fd_cfg = calculate_frechet_distance(mu_real, sig_real, mu_cfg, sig_cfg)
+    print(f"FD DDIM CFG (w=3.0): {fd_cfg:.4f}")
     
     # 6. Plot
     fig, axes = plt.subplots(1, 3, figsize=(18, 6))
     
-    def plot_data(ax, data, title):
+    def plot_data(ax, data, title, fd):
         # Denorm
         d = data * X_std + X_mean
         ax.scatter(d[:250, 0], d[:250, 1], c='cyan', label='Class 0', alpha=0.6, s=10)
         ax.scatter(d[250:, 0], d[250:, 1], c='orange', label='Class 1', alpha=0.6, s=10)
-        ax.set_title(title)
+        ax.set_title(f"{title}\nFD: {fd:.4f}")
         ax.legend()
 
-    plot_data(axes[0], s_ddpm, "DDPM (w=1.0)")
-    plot_data(axes[1], s_ddim, "DDIM (w=1.0)")
-    plot_data(axes[2], s_cfg, "DDIM CFG (w=3.0)")
+    plot_data(axes[0], s_ddpm, "DDPM (w=1.0)", fd_ddpm)
+    plot_data(axes[1], s_ddim, "DDIM (w=1.0)", fd_ddim)
+    plot_data(axes[2], s_cfg, "DDIM CFG (w=3.0)", fd_cfg)
     
     plt.tight_layout()
     plt.savefig("examples/two_moons_cfg_comparison.png")

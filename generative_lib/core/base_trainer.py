@@ -101,10 +101,13 @@ class BaseTrainer(ABC):
             else:
                 raise ValueError(f"Feature key '{k}' not found in batch keys: {list(batch.keys())}")
         # print(len(cond))
-        if len(cond) > 1:
-            cond = torch.cat(cond, dim=-1)
+        if cond:
+            if len(cond) > 1:
+                cond = torch.cat(cond, dim=-1)
+            else:
+                cond = cond[0]
         else:
-            cond = cond[0]
+            cond = None
 
         # Extract Labels (x)
         x = None
