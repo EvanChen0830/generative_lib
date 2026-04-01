@@ -54,8 +54,8 @@ class BaseTrainer(ABC):
             if checkpoint:
                 start_epoch = checkpoint.get("epoch", 0) + 1
                 run_id = checkpoint.get("run_id")
-                # If tracker has a logger, we update its run_id if not already set?
-                # Actually, Logger init handles run_id. If we resume, we should have passed run_id to Logger init?
+                if run_id and self.tracker.logger and hasattr(self.tracker.logger, "resume"):
+                    self.tracker.logger.resume(run_id)
                 
         print(f"Starting training on {self.device} from epoch {start_epoch} to {epochs}.")
         
@@ -77,7 +77,7 @@ class BaseTrainer(ABC):
             log_str += " ".join([f"{k}: {v:.4f}" for k, v in train_metrics.items()])
             if val_metrics:
                  log_str += " | " + " ".join([f"Val_{k}: {v:.4f}" for k, v in val_metrics.items()])
-            print(log_str)
+            
 
             # Checkpoint
             if self.tracker:
@@ -86,7 +86,9 @@ class BaseTrainer(ABC):
                 # Get run_id from Logger if exists
                 run_id = self.tracker.logger.run_id if (self.tracker.logger and hasattr(self.tracker.logger, 'run_id')) else None
                 self.tracker.save_checkpoint(self.model, self.optimizer, epoch, metric_val, run_id)
-
+            else:
+                print(log_str)
+                
     def _process_batch(self, batch: Dict[str, Any]) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Extracts features and labels from batch."""
         # Extract Features
@@ -169,7 +171,7 @@ class BaseTrainer(ABC):
             # Update progress bar
             pbar.set_postfix({"loss": final_loss.item()})
             
-        return {k: v / count for k, v in total_metrics.items()}
+        return {f"train_{k}": v / count for k, v in total_metrics.items()}
 
     def _validate(self, loader: DataLoader, epoch: int) -> Dict[str, float]:
         """Runs validation."""
@@ -192,4 +194,4 @@ class BaseTrainer(ABC):
                     if k not in total_metrics: total_metrics[k] = 0.0
                     total_metrics[k] += v.item()
                 
-        return {k: v / count for k, v in total_metrics.items()}
+        return {f"val_{k}": v / count for k, v in total_metrics.items()}

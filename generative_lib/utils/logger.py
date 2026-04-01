@@ -35,6 +35,29 @@ class Logger:
                 
             self.mlflow = mlflow
     
+    def resume(self, run_id: str):
+        """Resumes an existing MLflow run and optionally cleans up the currently initialized stray run."""
+        if not self.use_mlflow:
+            return
+
+        import mlflow
+        self.run_id = run_id
+
+        # End the currently active stray run.
+        stray_run = mlflow.active_run()
+        if stray_run:
+            mlflow.end_run()
+            try:
+                from mlflow.tracking import MlflowClient
+                client = MlflowClient()
+                client.delete_run(stray_run.info.run_id)
+                print(f"Deleted stray MLflow run: {stray_run.info.run_id}")
+            except Exception as e:
+                print(f"Failed to delete stray MLflow run {stray_run.info.run_id}: {e}")
+            
+        # Start the correct run
+        mlflow.start_run(run_id=run_id)
+
     def log_metrics(self, metrics: Dict[str, float], step: Optional[int] = None):
         """Logs scalar metrics."""
         if self.use_mlflow:
