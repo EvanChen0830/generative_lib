@@ -8,7 +8,7 @@ A modular, extensible PyTorch library for generative models, currently supportin
 - **Multiple Methods**:
   - Gaussian Diffusion (DDPM) and Classifier-Free Guidance (CFG Diffusion)
   - Flow Matching (Optimal Transport Conditional Flow Matching)
-  - Consistency Models (Skeleton)
+  - Consistency Models (Continuous-Time Karras EDM w/ EMA Preconditioning)
 - **Experiment Tracking**: First-class **MLflow** integration for metrics, parameters, and artifact logging.
 - **Resume Capability**: Seamlessly interrupt and resume training runs with full state restoration (model, optimizer, run ID).
 - **Flexible Data Handling**: Strictly dictionary-based data flow for complex multi-modal or conditional setups.
@@ -146,6 +146,7 @@ Check the `examples/` folder for running code:
 
 - `two_moons_diffusion.py`: Conditional Diffusion on 2D data.
 - `two_moons_flow.py`: Flow Matching on 2D data.
+- `two_moons_consistency.py`: Multi-Step Consistency Models on 2D data.
 - `test_resume.py`: Verifies training interruption and resumption.
 
 ## 🤝 Contributing

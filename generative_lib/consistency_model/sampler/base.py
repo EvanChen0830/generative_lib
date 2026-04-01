@@ -8,8 +8,8 @@ from ...core.base_method import BaseMethod
 class BaseConsistencyModelSampler(BaseSampler):
     """Sampler for Consistency Models."""
 
-    def __init__(self, method: BaseMethod, model: torch.nn.Module, device: str, steps: int = 1, label_keys: Optional[List[str]] = None):
-        super().__init__(method, model, device, label_keys=label_keys)
+    def __init__(self, method: BaseMethod, model: torch.nn.Module, device: str, steps: int = 1, feature_keys: Optional[List[str]] = None):
+        super().__init__(method, model, device, feature_keys=feature_keys)
         self.steps = steps
 
     def sample(
@@ -72,7 +72,24 @@ class BaseConsistencyModelSampler(BaseSampler):
 
     def _sample_batch(self, current_batch_size: int, shape: Union[torch.Size, List[int]], condition: Optional[torch.Tensor] = None) -> torch.Tensor:
         batch_shape = (current_batch_size, *shape)
-        x_T = torch.randn(batch_shape, device=self.device) * self.method.sigma_max
-        T_val = self.method.sigma_max
-        x_0 = self.method.predict(self.model, x_T, float(T_val), condition)
-        return x_0
+        x = torch.randn(batch_shape, device=self.device) * self.method.sigma_max
+        
+        if self.steps <= 1:
+            return self.method.predict(self.model, x, float(self.method.sigma_max), condition)
+            
+        t_seq = []
+        for i in range(self.steps):
+            t_curr = (self.method.sigma_max**(1/self.method.rho) + i / (self.steps - 1) * (self.method.sigma_min**(1/self.method.rho) - self.method.sigma_max**(1/self.method.rho)))**self.method.rho
+            t_seq.append(t_curr)
+            
+        x = self.method.predict(self.model, x, float(t_seq[0]), condition)
+        epsilon = self.method.sigma_min
+        
+        for i in range(1, self.steps):
+            t_curr = t_seq[i]
+            z = torch.randn_like(x)
+            std = float(np.sqrt(max(0, t_curr**2 - epsilon**2)))
+            x_noisy = x + z * std
+            x = self.method.predict(self.model, x_noisy, float(t_curr), condition)
+            
+        return x
