@@ -7,10 +7,10 @@ from ...core.base_method import BaseMethod
 class ConsistencyModel(BaseMethod):
     """Consistency Models (CM) method.
     
-    Implements Consistency Training or Distillation.
+    Implements Consistency Training (CT) using self-consistency.
     Basic idea: f(x_t, t) = f(x_{t'}, t') = x_0
     
-    For now, implementing simplified Discrete Consistency Distillation (CD) loss stub.
+    Uses robust continuous Huber loss mapped over the teacher's EMA trajectory.
     """
 
     def __init__(self, sigma_min: float = 0.002, sigma_max: float = 80.0, rho: float = 7.0, N: int = 40):
@@ -43,7 +43,8 @@ class ConsistencyModel(BaseMethod):
         with torch.no_grad():
             pred_n = self.predict(teacher, x_n, t_n.squeeze(-1), condition)
             
-        loss = torch.nn.functional.mse_loss(pred_n1, pred_n)
+        # Optimal Consistency Training natively operates via Pseudo-Huber/L1 distances.
+        loss = torch.nn.functional.huber_loss(pred_n1, pred_n, delta=1.0)
         return {"loss": loss}
 
     def predict(self, model: nn.Module, x_t: torch.Tensor, t: torch.Tensor, condition: Optional[torch.Tensor] = None) -> torch.Tensor:

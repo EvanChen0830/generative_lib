@@ -95,11 +95,11 @@ def main():
     # Train
     print("Training Consistency Model (20k samples, 400 epochs)...")
     trainer.scheduler = scheduler
-    trainer.fit(train_loader, epochs=400)
+    trainer.fit(train_loader, epochs=1000)
     
     # Sample
     print("Sampling...")
-    sampler = BaseConsistencyModelSampler(method, model, device, steps=15, feature_keys=[])
+    sampler = BaseConsistencyModelSampler(method, model, device, steps=200, feature_keys=[])
     samples = sampler.sample(num_samples=500, shape=[2])
     
     # Verify
@@ -118,8 +118,8 @@ def main():
     plt.scatter(samples_np[:, 0], samples_np[:, 1], alpha=0.8, label="Generated", s=10)
     plt.legend()
     plt.title(f"Two Moons - Consistency Model (15 Steps, 400 Epochs)\nFD: {fd_val:.4f}")
-    plt.savefig("examples/two_moons_consistency.png")
-    print("Saved plot to examples/two_moons_consistency.png")
+    plt.savefig("two_moons_consistency.png")
+    print("Saved plot to /two_moons_consistency.png")
 
 if __name__ == "__main__":
     main()

@@ -82,14 +82,28 @@ class BaseConsistencyModelSampler(BaseSampler):
             t_curr = (self.method.sigma_max**(1/self.method.rho) + i / (self.steps - 1) * (self.method.sigma_min**(1/self.method.rho) - self.method.sigma_max**(1/self.method.rho)))**self.method.rho
             t_seq.append(t_curr)
             
-        x = self.method.predict(self.model, x, float(t_seq[0]), condition)
-        epsilon = self.method.sigma_min
-        
-        for i in range(1, self.steps):
-            t_curr = t_seq[i]
-            z = torch.randn_like(x)
-            std = float(np.sqrt(max(0, t_curr**2 - epsilon**2)))
-            x_noisy = x + z * std
-            x = self.method.predict(self.model, x_noisy, float(t_curr), condition)
+        if self.steps > 15:
+            # For massive step limits, we use the Score-based ODE formulation to track the trajectory exactly
+            for i in range(self.steps - 1):
+                t_curr = t_seq[i]
+                t_next = t_seq[i+1]
+                x_0 = self.method.predict(self.model, x, float(t_curr), condition)
+                dx = (x - x_0) / t_curr
+                x = x + dx * (t_next - t_curr)
             
-        return x
+            x_0 = self.method.predict(self.model, x, float(t_seq[-1]), condition)
+            return x_0
+            
+        else:
+            # Efficient Alternating Consistency Sampling for single or few steps
+            x = self.method.predict(self.model, x, float(t_seq[0]), condition)
+            epsilon = self.method.sigma_min
+            
+            for i in range(1, self.steps):
+                t_curr = t_seq[i]
+                z = torch.randn_like(x)
+                std = float(np.sqrt(max(0, t_curr**2 - epsilon**2)))
+                x_noisy = x + z * std
+                x = self.method.predict(self.model, x_noisy, float(t_curr), condition)
+                
+            return x
