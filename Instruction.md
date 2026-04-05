@@ -8,52 +8,57 @@ generative_lib/
 │   ├── __init__.py
 │   ├── base_method.py       # Abstract Physics Interface (SDE/ODE)
 │   ├── base_trainer.py      # Abstract Loop Engine
-│   └── base_sampler.py      # Abstract Inference Engine
+│   ├── base_sampler.py      # Abstract Inference Engine
+│   ├── base_operator.py     # Measurement operators (BaseOperator, MaskingOperator)
+│   └── base_evaluator.py    # Evaluation interface
 ├── diffusion/
 │   ├── __init__.py
 │   └── method/           # Diffusion Family
 │       ├── __init__.py
 │       ├── gaussian_diffusion.py        # GaussianDiffusion
-│       ├── cfg_diffusion.py       # CFGDiffusion
+│       ├── cfg_diffusion.py             # CFGDiffusion
 │   └── trainer/           # Diffusion Family
 │       ├── __init__.py
-│       ├── base_diffusion_trainer.py        # BaseDiffusionTrainer & inherit from base_trainer
-
+│       ├── base_diffusion_trainer.py    # BaseDiffusionTrainer & inherit from base_trainer
 │   └── sampler/           # Diffusion Family
 │       ├── __init__.py
-│       ├── base_diffusion_sampler.py        # BaseDiffusionSampler & inherit from base_sampler
+│       ├── base.py                      # BaseDiffusionSampler (standard forward sampling)
+│       ├── base_inverse.py              # BaseInverseSampler (SDEdit init + inverse loop)
+│       ├── dps.py                       # DPSSampler (gradient-guided posterior sampling)
+│       ├── repaint.py                   # RepaintSampler (hard replacement inpainting)
+│       └── sdedit.py                    # SDEditSampler (mid-step denoising)
 ├── flow_matching/
 │   ├── __init__.py
 │   └── method/           # Flow Matching Family
 │       ├── __init__.py
-│       ├── flow_matching.py        # FlowMatching
+│       ├── flow_matching.py             # FlowMatching
 │   └── trainer/           # Flow Matching Family
 │       ├── __init__.py
-│       ├── base_flow_matching_trainer.py        # BaseFlowMatchingTrainer & inherit from base_trainer
-
+│       ├── base_flow_matching_trainer.py   # BaseFlowMatchingTrainer & inherit from base_trainer
 │   └── sampler/           # Flow Matching Family
 │       ├── __init__.py
-│       ├── base_flow_matching_sampler.py        # BaseFlowMatchingSampler & inherit from base_sampler
+│       ├── base_flow_matching_sampler.py   # BaseFlowMatchingSampler & inherit from base_sampler
 ├── consistency_model/
 │   ├── __init__.py
 │   └── method/           # Consistency Model Family
 │       ├── __init__.py
-│       ├── consistency_model.py        # ConsistencyModel
+│       ├── consistency_model.py            # ConsistencyModel
 │   └── trainer/           # Consistency Model Family
 │       ├── __init__.py
-│       ├── base_consistency_model_trainer.py        # BaseConsistencyModelTrainer & inherit from base_trainer
-
+│       ├── base_consistency_model_trainer.py  # BaseConsistencyModelTrainer & inherit from base_trainer
 │   └── sampler/           # Consistency Model Family
 │       ├── __init__.py
-│       ├── base_consistency_model_sampler.py        # BaseConsistencyModelSampler & inherit from base_sampler
+│       ├── base_consistency_model_sampler.py  # BaseConsistencyModelSampler & inherit from base_sampler
+├── evaluator/
+│   ├── __init__.py
+│   └── ...               # Evaluation utilities
 ├── utils/
 │   ├── __init__.py
 │   ├── tracker.py           # ModelTracker (Best/Last/Resume)
 │   ├── logger.py            # Logger (MLflow/Tensorboard wrapper)
 ├── metrics/
 │   ├── __init__.py
-│   ├── dist_metrics.py           # DistributionMetrics
-
+│   ├── dist_metrics.py      # DistributionMetrics
 
 ```
 
