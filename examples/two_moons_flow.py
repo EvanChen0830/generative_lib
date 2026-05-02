@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.datasets import make_moons
 from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 from generative_lib.flow_matching.method.flow_matching import FlowMatching
 from generative_lib.flow_matching.trainer.base import BaseFlowMatchingTrainer
@@ -32,6 +33,9 @@ class SimpleMLP(nn.Module):
 
 def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    output_dir = Path(__file__).resolve().parent.parent / "runs" / "examples" / "two_moons_flow"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    figure_path = output_dir / "two_moons_flow.png"
     
     # 2. Prepare Data
     X, _ = make_moons(n_samples=20000, noise=0.05)
@@ -90,8 +94,8 @@ def main():
     plt.scatter(samples_np[:, 0], samples_np[:, 1], alpha=0.8, label="Generated")
     plt.legend()
     plt.title(f"Two Moons - Flow Matching (20k Data, 200 Epochs)\nFD: {fd_flow:.4f}")
-    plt.savefig("examples/two_moons_flow.png")
-    print("Saved plot to examples/two_moons_flow.png")
+    plt.savefig(figure_path)
+    print(f"Saved plot to {figure_path}")
 
 if __name__ == "__main__":
     main()

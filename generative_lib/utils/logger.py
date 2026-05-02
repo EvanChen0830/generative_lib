@@ -1,5 +1,6 @@
 from typing import Dict, Optional, Any
 import os
+from pathlib import Path
 
 class Logger:
     """Unified Logger wrapper (MLflow)."""
@@ -34,28 +35,25 @@ class Logger:
                 self.run_id = run.info.run_id
                 
             self.mlflow = mlflow
+
+    def is_active(self) -> bool:
+        return self.use_mlflow and hasattr(self, "mlflow")
     
     def resume(self, run_id: str):
-        """Resumes an existing MLflow run and optionally cleans up the currently initialized stray run."""
+        """Resumes an existing MLflow run."""
         if not self.use_mlflow:
             return
 
         import mlflow
         self.run_id = run_id
 
-        # End the currently active stray run.
-        stray_run = mlflow.active_run()
-        if stray_run:
+        active_run = mlflow.active_run()
+        if active_run and active_run.info.run_id == run_id:
+            return
+
+        if active_run:
             mlflow.end_run()
-            try:
-                from mlflow.tracking import MlflowClient
-                client = MlflowClient()
-                client.delete_run(stray_run.info.run_id)
-                print(f"Deleted stray MLflow run: {stray_run.info.run_id}")
-            except Exception as e:
-                print(f"Failed to delete stray MLflow run {stray_run.info.run_id}: {e}")
-            
-        # Start the correct run
+
         mlflow.start_run(run_id=run_id)
 
     def log_metrics(self, metrics: Dict[str, float], step: Optional[int] = None):
@@ -68,7 +66,32 @@ class Logger:
         if self.use_mlflow:
             self.mlflow.log_params(params)
 
+    def set_tags(self, tags: Dict[str, Any]):
+        """Logs run tags."""
+        if self.is_active():
+            self.mlflow.set_tags(tags)
+
+    def log_artifact(self, local_path: str, artifact_path: Optional[str] = None):
+        """Logs a single file artifact."""
+        if self.is_active():
+            self.mlflow.log_artifact(local_path, artifact_path=artifact_path)
+
+    def log_artifacts(self, local_dir: str, artifact_path: Optional[str] = None):
+        """Logs all artifacts from a directory."""
+        if self.is_active():
+            self.mlflow.log_artifacts(local_dir, artifact_path=artifact_path)
+
+    def log_text(self, text: str, artifact_file: str):
+        """Logs a text artifact."""
+        if self.is_active():
+            self.mlflow.log_text(text, artifact_file)
+
+    def log_figure(self, figure: Any, artifact_file: str):
+        """Logs a matplotlib figure artifact."""
+        if self.is_active():
+            self.mlflow.log_figure(figure, artifact_file)
+
     def finish(self):
         """Ends the run."""
-        if self.use_mlflow:
+        if self.is_active():
             self.mlflow.end_run()

@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import os
-import copy
 from typing import Optional, Any, Dict
 from .logger import Logger
 
@@ -15,17 +14,31 @@ class ModelTracker:
         save_dir: str,
         logger: Optional[Logger] = None,
         best_metric: str = "loss",
-        mode: str = "min"
+        mode: str = "min",
+        save_every_n_epochs: Optional[int] = None,
     ):
         self.save_dir = save_dir
         self.logger = logger
         self.best_metric = best_metric
         self.mode = mode
+        self.save_every_n_epochs = save_every_n_epochs
         
         # Initialize best score
         self.best_score = float('inf') if mode == "min" else float('-inf')
         
         os.makedirs(save_dir, exist_ok=True)
+        self._restore_best_score()
+
+    def _restore_best_score(self):
+        """Restores the best metric from disk when available."""
+        best_path = os.path.join(self.save_dir, "best.pt")
+        if not os.path.exists(best_path):
+            return
+
+        checkpoint = torch.load(best_path, map_location="cpu")
+        metric = checkpoint.get("metric")
+        if metric is not None:
+            self.best_score = metric
 
     def save_checkpoint(
         self,
@@ -48,6 +61,10 @@ class ModelTracker:
         # Save Last
         last_path = os.path.join(self.save_dir, "last.pt")
         torch.save(state, last_path)
+
+        if self.save_every_n_epochs and epoch % self.save_every_n_epochs == 0:
+            epoch_path = os.path.join(self.save_dir, f"epoch_{epoch:04d}.pt")
+            torch.save(state, epoch_path)
         
         # Check Best
         is_best = False
@@ -72,6 +89,8 @@ class ModelTracker:
             
         checkpoint = torch.load(path, map_location=next(model.parameters()).device)
         model.load_state_dict(checkpoint["model_state"])
+        if optimizer is not None and "optimizer_state" in checkpoint:
+            optimizer.load_state_dict(checkpoint["optimizer_state"])
         
         print(f"Loaded last model from {path} (Epoch {checkpoint['epoch']})")
         return checkpoint

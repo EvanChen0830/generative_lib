@@ -5,6 +5,7 @@ from sklearn.datasets import make_moons
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import math
+from pathlib import Path
 
 from generative_lib.diffusion.method.gaussian_diffusion import GaussianDiffusion
 from generative_lib.diffusion.trainer.base import BaseDiffusionTrainer
@@ -53,6 +54,9 @@ class SimpleMLP(nn.Module):
 
 def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    output_dir = Path(__file__).resolve().parent.parent / "runs" / "examples" / "two_moons_inverse"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    figure_path = output_dir / "two_moons_inverse.png"
     
     X, y = make_moons(n_samples=20000, noise=0.05)
     X_mean = X.mean(axis=0)
@@ -146,8 +150,8 @@ def main():
     axes[2].legend()
 
     
-    plt.savefig("examples/two_moons_inverse.png")
-    print("Saved to examples/two_moons_inverse.png")
+    plt.savefig(figure_path)
+    print(f"Saved to {figure_path}")
 
 if __name__ == "__main__":
     main()

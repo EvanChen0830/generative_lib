@@ -90,7 +90,8 @@ from generative_lib.utils.tracker import ModelTracker
 
 # 1. Setup Method (DDPM or CFG)
 method = GaussianDiffusion(timesteps=1000, schedule="linear")
-# OR for CFG: method = CFGDiffusion(timesteps=1000, schedule="linear", unconditional_value=0.0)
+# OR for CFG: method = CFGDiffusion(timesteps=1000, schedule="linear", unconditional_value=-1.0)
+# Important: choose an unconditional value that does not overlap with real labels.
 
 # 2. Setup Logger & Tracker
 logger = Logger(

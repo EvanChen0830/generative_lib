@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.datasets import make_moons
 from torch.utils.data import DataLoader
 import math
+from pathlib import Path
 
 from generative_lib.diffusion.method.gaussian_diffusion import GaussianDiffusion
 from generative_lib.diffusion.trainer.base import BaseDiffusionTrainer
@@ -53,6 +54,8 @@ class SimpleMLP(nn.Module):
 
 def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    output_dir = Path(__file__).resolve().parent.parent / "runs" / "examples" / "test_evaluator"
+    output_dir.mkdir(parents=True, exist_ok=True)
     
     # 2. Data
     X, y = make_moons(n_samples=500, noise=0.05)
@@ -74,8 +77,8 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     method = GaussianDiffusion(timesteps=1000, schedule="linear")
     
-    logger = Logger(project_name="EvalTest", run_name="FID_ReCheck", use_mlflow=True, mlflow_uri="file:./examples/mlruns")
-    tracker = ModelTracker(exp_name="EvalTest", model_name="Diff", save_dir="./checkpoints/eval_test", logger=logger)
+    logger = Logger(project_name="EvalTest", run_name="FID_ReCheck", use_mlflow=True, mlflow_uri=f"file:{output_dir / 'mlruns'}")
+    tracker = ModelTracker(exp_name="EvalTest", model_name="Diff", save_dir=str(output_dir / "checkpoints" / "eval_test"), logger=logger)
     
     trainer = BaseDiffusionTrainer(
         method=method,

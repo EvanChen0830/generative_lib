@@ -1,11 +1,9 @@
-from abc import ABC, abstractmethod
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import Optional, Dict, Any, List, Tuple
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-import os
 from .base_method import BaseMethod
 
 class BaseTrainer(ABC):
@@ -76,18 +74,16 @@ class BaseTrainer(ABC):
             log_str = f"Epoch {epoch}/{epochs} | "
             log_str += " ".join([f"{k}: {v:.4f}" for k, v in train_metrics.items()])
             if val_metrics:
-                 log_str += " | " + " ".join([f"Val_{k}: {v:.4f}" for k, v in val_metrics.items()])
-            
+                 log_str += " | " + " ".join([f"{k}: {v:.4f}" for k, v in val_metrics.items()])
+            print(log_str)
 
             # Checkpoint
             if self.tracker:
-                # We save based on the first metric in val_metrics if available, otherwise 'loss'
-                metric_val = val_metrics.get("loss", train_metrics.get("loss", 0.0))
+                # Prefer validation loss when available, otherwise fall back to training loss.
+                metric_val = val_metrics.get("val_loss", train_metrics.get("train_loss", 0.0))
                 # Get run_id from Logger if exists
                 run_id = self.tracker.logger.run_id if (self.tracker.logger and hasattr(self.tracker.logger, 'run_id')) else None
                 self.tracker.save_checkpoint(self.model, self.optimizer, epoch, metric_val, run_id)
-            else:
-                print(log_str)
                 
     def _process_batch(self, batch: Dict[str, Any]) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Extracts features and labels from batch."""

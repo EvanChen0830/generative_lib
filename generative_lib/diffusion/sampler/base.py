@@ -17,7 +17,7 @@ class BaseDiffusionSampler(BaseSampler):
         feature_keys: Optional[List[str]] = None,
         sampler_type: str = "ddpm", # 'ddpm' or 'ddim'
         guidance_scale: float = 1.0,
-        unconditional_value: float = 0.0
+        unconditional_value: float = -1.0
     ):
         super().__init__(method, model, device, feature_keys=feature_keys)
         self.steps = steps

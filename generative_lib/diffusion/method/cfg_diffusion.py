@@ -4,11 +4,17 @@ import torch.nn as nn
 from .gaussian_diffusion import GaussianDiffusion
 
 class CFGDiffusion(GaussianDiffusion):
-    """Gaussian Diffusion with Classifier-Free Guidance support (Dual Loss)."""
+    """Gaussian Diffusion with Classifier-Free Guidance support (Dual Loss).
+
+    `unconditional_value` should be outside the support of real conditioning
+    values. For example, if class labels are encoded as `0` and `1`, using
+    `0.0` as the unconditional token will alias the unconditional branch with
+    class `0` and degrade CFG behavior.
+    """
 
     def __init__(
         self,
-        unconditional_value: float = 0.0,
+        unconditional_value: float = -1.0,
         schedule: str = "linear",
         timesteps: int = 1000,
         beta_start: float = 1e-4,
@@ -16,9 +22,7 @@ class CFGDiffusion(GaussianDiffusion):
         prediction_type: str = "epsilon",
     ):
         super().__init__(schedule, timesteps, beta_start, beta_end, prediction_type)
-        # We store unconditional_value as a tensor-ready scalar or 1D tensor?
-        # Ideally, the user might pass a tensor matching condition dim.
-        # For simplicity, we assume it's a scalar (0.0) or handle it dynamically.
+        # This scalar is broadcast to the full condition tensor during CFG.
         self.unconditional_value = unconditional_value
 
     def compute_loss(self, model: nn.Module, x: torch.Tensor, condition: Optional[torch.Tensor] = None) -> Dict[str, torch.Tensor]:
