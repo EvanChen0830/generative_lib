@@ -4,6 +4,7 @@ This folder should contain source example scripts only.
 
 Current examples:
 - `two_moons_diffusion.py`: conditional diffusion / CFG sampling on two moons
+- `two_moons_consistency.py`: conditional consistency model on two moons
 - `two_moons_flow.py`: unconditional flow matching on two moons
 - `two_moons_inverse.py`: inverse-problem samplers on top of diffusion
 - `test_evaluator.py`: evaluator and metric smoke test

@@ -46,7 +46,8 @@ class ModelTracker:
         optimizer: torch.optim.Optimizer,
         epoch: int,
         metric_val: float,
-        run_id: Optional[str] = None
+        run_id: Optional[str] = None,
+        extra_state: Optional[Dict[str, Any]] = None,
     ):
         """Saves 'last.pt' and optionally 'best.pt'."""
         
@@ -57,6 +58,8 @@ class ModelTracker:
             "metric": metric_val,
             "run_id": run_id
         }
+        if extra_state:
+            state.update(extra_state)
         
         # Save Last
         last_path = os.path.join(self.save_dir, "last.pt")
