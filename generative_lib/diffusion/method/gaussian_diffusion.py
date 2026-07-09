@@ -1,6 +1,7 @@
+import math
+
 import torch
 import torch.nn as nn
-import numpy as np
 from typing import Dict, Optional, Tuple
 from ...core.base_method import BaseMethod
 
@@ -27,8 +28,7 @@ class GaussianDiffusion(BaseMethod):
         if schedule == "linear":
             self.betas = torch.linspace(beta_start, beta_end, timesteps)
         elif schedule == "cosine":
-             # Simple cosine schedule approximation
-             self.betas = torch.linspace(beta_start, beta_end, timesteps) # Placeholder for now
+            self.betas = self._cosine_beta_schedule(timesteps)
         else:
             raise NotImplementedError(f"Schedule {schedule} not implemented")
 
@@ -38,6 +38,16 @@ class GaussianDiffusion(BaseMethod):
         # Helper variables (register as buffers to save with state_dict)
         self.register_buffer("sqrt_alphas_cumprod", torch.sqrt(self.alphas_cumprod))
         self.register_buffer("sqrt_one_minus_alphas_cumprod", torch.sqrt(1.0 - self.alphas_cumprod))
+
+    @staticmethod
+    def _cosine_beta_schedule(timesteps: int, s: float = 0.008) -> torch.Tensor:
+        """Cosine schedule from Nichol & Dhariwal, "Improved DDPM" (arXiv:2102.09672)."""
+        steps = timesteps + 1
+        x = torch.linspace(0, timesteps, steps)
+        alphas_cumprod = torch.cos(((x / timesteps) + s) / (1 + s) * math.pi * 0.5) ** 2
+        alphas_cumprod = alphas_cumprod / alphas_cumprod[0]
+        betas = 1 - (alphas_cumprod[1:] / alphas_cumprod[:-1])
+        return torch.clip(betas, 0.0001, 0.9999)
 
     def compute_loss(self, model: nn.Module, x: torch.Tensor, condition: Optional[torch.Tensor] = None) -> Dict[str, torch.Tensor]:
         """Computes DDPM MSE loss."""
