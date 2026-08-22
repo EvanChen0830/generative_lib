@@ -1,6 +1,6 @@
 ---
 name: generative-lib
-description: Use this repository's generative_lib package to train, sample, run inference, solve inverse problems, and evaluate generative models. Covers GaussianDiffusion, CFGDiffusion, FlowMatching, ConsistencyModel, ModelTracker checkpoints, MLflow logging, dictionary DataLoader contracts, sampler shapes, and Evaluator/Frechet-distance evaluation.
+description: Use this repository's generative_lib package to train, sample, run inference, solve inverse problems, and evaluate generative models. Covers GaussianDiffusion, CFGDiffusion, FlowMatching, ConsistencyModel, ModelTracker checkpoints, Weights & Biases logging, dictionary DataLoader contracts, sampler shapes, and Evaluator/Frechet-distance evaluation.
 license: Complete terms in LICENSE
 ---
 
@@ -8,7 +8,7 @@ license: Complete terms in LICENSE
 
 ## Overview
 
-Use this skill when a user wants to build or run experiments with this repo's `generative_lib` package. The package is a modular PyTorch library for generative modeling with diffusion, flow matching, consistency models, inverse problem samplers, MLflow logging, checkpoints, and Frechet-distance evaluation.
+Use this skill when a user wants to build or run experiments with this repo's `generative_lib` package. The package is a modular PyTorch library for generative modeling with diffusion, flow matching, consistency models, inverse problem samplers, Weights & Biases logging, checkpoints, and Frechet-distance evaluation.
 
 The main contract is simple: datasets yield dictionaries, trainers map dictionary keys into `(x, condition)`, samplers produce tensors, and evaluators compare generated tensors against held-out real data.
 
@@ -96,8 +96,8 @@ method = GaussianDiffusion(timesteps=1000, schedule="linear")
 logger = Logger(
     project_name="MyProject",
     run_name="diffusion_baseline",
-    use_mlflow=True,
-    mlflow_uri="file:./mlruns",
+    use_wandb=True,
+    wandb_mode="offline",
 )
 
 tracker = ModelTracker(
@@ -128,7 +128,7 @@ Training notes:
 - The trainer logs metrics returned by `method.compute_loss`.
 - The checkpoint score is `val_loss` when validation exists; otherwise it uses training loss.
 - `ModelTracker` writes `last.pt` each epoch and updates `best.pt` when the metric improves.
-- If MLflow is enabled, call `Logger.finish()` after the run.
+- If Weights & Biases is enabled, call `Logger.finish()` after the run.
 
 ## Train a Flow Matching Model
 
@@ -386,7 +386,7 @@ Before reporting evaluation:
 - Generated tensors are shaped intentionally.
 - Evaluation uses held-out real data.
 - Metrics are computed in the intended normalized or original data space.
-- MLflow run is finished if logging is enabled.
+- Weights & Biases run is finished if logging is enabled.
 
 ## Useful Examples
 

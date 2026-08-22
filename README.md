@@ -1,6 +1,6 @@
 # Generative Lib
 
-A modular, extensible PyTorch library for generative models, currently supporting **Gaussian Diffusion**, **Flow Matching**, and **Inverse Problem Solving** (DPS, RePaint, SDEdit). Designed with a focus on clean architecture, research flexibility, and robust experiment tracking via MLflow.
+A modular, extensible PyTorch library for generative models, currently supporting **Gaussian Diffusion**, **Flow Matching**, and **Inverse Problem Solving** (DPS, RePaint, SDEdit). Designed with a focus on clean architecture, research flexibility, and robust experiment tracking via Weights & Biases.
 
 ## 🚀 Features
 
@@ -14,7 +14,7 @@ A modular, extensible PyTorch library for generative models, currently supportin
   - **RePaint** — hard replacement inpainting with jump-back resampling for known/unknown region harmonization
   - **SDEdit** — mid-step stochastic differential editing for denoising corrupted inputs back onto the learned manifold
 - **Measurement Operators**: Pluggable `BaseOperator` / `MaskingOperator` abstraction for defining forward measurement models
-- **Experiment Tracking**: First-class **MLflow** integration for metrics, parameters, and artifact logging.
+- **Experiment Tracking**: First-class **Weights & Biases** integration for metrics, parameters, and artifact logging.
 - **Resume Capability**: Seamlessly interrupt and resume training runs with full state restoration (model, optimizer, run ID).
 - **Flexible Data Handling**: Strictly dictionary-based data flow for complex multi-modal or conditional setups.
 
@@ -97,8 +97,8 @@ method = GaussianDiffusion(timesteps=1000, schedule="linear")
 logger = Logger(
     project_name="MyProject", 
     run_name="gaussian_simple_mlp", 
-    use_mlflow=True, 
-    mlflow_uri="file:./mlruns"
+    use_wandb=True,
+    wandb_mode="offline"
 )
 tracker = ModelTracker(
     exp_name="MyProject", 
@@ -220,10 +220,10 @@ sampler = SDEditSampler(
 samples = sampler.sample(num_samples=200, shape=[2])
 ```
 
-### 5. MLflow Logging
+### 5. Weights & Biases Logging
 
-- **View UI**: Run `mlflow ui` inside the directory where your `mlruns` are stored.
-- **Resume**: If `resume=True`, the trainer will look for the last checkpoint and automatically attach to the **same** MLflow Run ID, ensuring continuous learning curves.
+- **View UI**: Run `W&B ui` inside the directory where your `mlruns` are stored.
+- **Resume**: If `resume=True`, the trainer will look for the last checkpoint and automatically attach to the **same** Weights & Biases Run ID, ensuring continuous learning curves.
 
 ## 📝 Examples
 

@@ -17,29 +17,9 @@ class BaseConsistencyModelSampler(BaseSampler):
         device: str,
         steps: int = 1,
         feature_keys: Optional[List[str]] = None,
-        guidance_scale: float = 1.0,
-        unconditional_value: float = -1.0,
     ):
         super().__init__(method, model, device, feature_keys=feature_keys)
         self.steps = steps
-        self.guidance_scale = guidance_scale
-        self.unconditional_value = unconditional_value
-
-    def _guided_predict(
-        self,
-        x: torch.Tensor,
-        t: float,
-        condition: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
-        if self.guidance_scale == 1.0 or condition is None:
-            return self.method.predict(self.model, x, t, condition)
-
-        x_in = torch.cat([x, x], dim=0)
-        uncond = torch.full_like(condition, self.unconditional_value)
-        c_in = torch.cat([condition, uncond], dim=0)
-        pred_all = self.method.predict(self.model, x_in, t, c_in)
-        pred_cond, pred_uncond = torch.chunk(pred_all, 2, dim=0)
-        return pred_uncond + self.guidance_scale * (pred_cond - pred_uncond)
 
     def sample(
         self,
@@ -64,6 +44,46 @@ class BaseConsistencyModelSampler(BaseSampler):
             return flat_samples.view(batch_conditions, num_samples, *shape)
         return flat_samples
 
+    def sample_unconditional(
+        self,
+        num_samples: int,
+        shape: Union[torch.Size, List[int]],
+    ) -> torch.Tensor:
+        """Generates samples from an unconditional consistency model.
+
+        Args:
+            num_samples: Number of samples to generate.
+            shape: Event shape of an individual sample.
+
+        Returns:
+            Generated samples with shape ``[num_samples, *shape]``.
+        """
+        return self._sample_batch(num_samples, shape)
+
+    def sample_conditional(
+        self,
+        num_samples: int,
+        shape: Union[torch.Size, List[int]],
+        condition: torch.Tensor,
+    ) -> torch.Tensor:
+        """Generates samples for each supplied condition.
+
+        Args:
+            num_samples: Samples to generate per condition.
+            shape: Event shape of an individual sample.
+            condition: Conditions with shape ``[num_conditions, *condition_shape]``.
+
+        Returns:
+            Generated samples with shape ``[num_conditions, num_samples, *shape]``.
+        """
+        if condition.ndim == 1:
+            condition = condition.unsqueeze(0)
+        condition = condition.to(self.device)
+        num_conditions = condition.shape[0]
+        expanded_condition = condition.repeat_interleave(num_samples, dim=0)
+        samples = self._sample_batch(num_conditions * num_samples, shape, expanded_condition)
+        return samples.view(num_conditions, num_samples, *shape)
+
     def batch_sample(
         self,
         num_samples: int,
@@ -71,7 +91,7 @@ class BaseConsistencyModelSampler(BaseSampler):
         dataloader: torch.utils.data.DataLoader,
     ) -> torch.Tensor:
         all_samples = []
-        print(f"Sampling from dataloader (CM, w={self.guidance_scale}) with {self.steps} steps...")
+        print(f"Sampling from dataloader (CM) with {self.steps} steps...")
         for batch in tqdm(dataloader, desc="Dataloader Sampling"):
             cond = self._extract_condition(batch)
             if cond is None:
@@ -93,20 +113,19 @@ class BaseConsistencyModelSampler(BaseSampler):
         condition: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         batch_shape = (current_batch_size, *shape)
-        x = torch.randn(batch_shape, device=self.device) * (self.method.sigma_max * 1.5)
+        x = torch.randn(batch_shape, device=self.device) * self.method.sigma_max
 
         if self.steps <= 1:
-            return self._guided_predict(x, float(self.method.sigma_max), condition)
+            return self.method.predict(self.model, x, float(self.method.sigma_max), condition)
 
-        sigmas = self.method.sample_seq_sigmas(self.steps, self.device, schedule="linear")
-        x = self._guided_predict(x, float(self.method.sigma_max), condition)
+        sigmas = self.method.sample_seq_sigmas(self.steps, self.device)
+        x = self.method.predict(self.model, x, float(sigmas[0]), condition)
 
         for sigma in sigmas[1:]:
-            sigma = torch.clamp(sigma, min=self.method.sigma_min, max=self.method.sigma_max)
             sigma_value = float(sigma.item())
             z = torch.randn_like(x)
             noise_scale = max(sigma_value**2 - self.method.sigma_min**2, 0.0) ** 0.5
             x = x + noise_scale * z
-            x = self._guided_predict(x, sigma_value, condition)
+            x = self.method.predict(self.model, x, sigma_value, condition)
 
         return x

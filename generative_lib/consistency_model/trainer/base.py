@@ -1,5 +1,5 @@
 import copy
-from typing import Dict, Optional
+from typing import Callable, Dict, Optional
 
 import torch
 from torch.utils.data import DataLoader
@@ -9,7 +9,12 @@ from ...core.base_trainer import BaseTrainer
 
 
 class BaseConsistencyModelTrainer(BaseTrainer):
-    """Trainer for consistency models with target-teacher and EMA eval tracking."""
+    """Trainer for consistency models with an EMA target teacher.
+
+    The target model is the paper's ``theta_minus`` model.  It is both the
+    stop-gradient teacher during training and the model used for generation.
+    ``ema_model`` is retained for diffusion pretraining compatibility only.
+    """
 
     def __init__(self, *args, ema_decay: float = 0.999, **kwargs):
         super().__init__(*args, **kwargs)
@@ -20,6 +25,14 @@ class BaseConsistencyModelTrainer(BaseTrainer):
             param.requires_grad = False
         for param in self.target_model.parameters():
             param.requires_grad = False
+
+    def get_sampling_model(self) -> torch.nn.Module:
+        """Returns the EMA target model used for consistency-model sampling.
+
+        Returns:
+            The target-teacher model (``theta_minus``).
+        """
+        return self.target_model
 
     def _update_ema_model(self) -> None:
         with torch.no_grad():
@@ -32,13 +45,11 @@ class BaseConsistencyModelTrainer(BaseTrainer):
         with torch.no_grad():
             for p_model, p_target in zip(self.model.parameters(), self.target_model.parameters()):
                 p_target.copy_(p_target * rate + p_model * (1 - rate))
-            for b_model, b_target in zip(self.model.buffers(), self.target_model.buffers()):
-                b_target.copy_(b_model)
 
     def _train_epoch(self, loader: DataLoader, epoch: int, total_epochs: int) -> Dict[str, float]:
         self.model.train()
         self.ema_model.eval()
-        self.target_model.eval()
+        self.target_model.train()
 
         total_metrics = {}
         count = 0
@@ -141,7 +152,9 @@ class BaseConsistencyModelTrainer(BaseTrainer):
         val_loader: Optional[DataLoader] = None,
         epochs: int = 100,
         resume: bool = False,
+        early_stop_fn: Optional[Callable[[Dict[str, float]], bool]] = None,
     ):
+        stop_fn = early_stop_fn or self.early_stop_fn
         start_epoch = 1
 
         if resume and self.tracker:
@@ -157,6 +170,9 @@ class BaseConsistencyModelTrainer(BaseTrainer):
                     self.target_model.load_state_dict(target_state)
                 else:
                     self.target_model.load_state_dict(self.model.state_dict())
+                scheduler_state = checkpoint.get("scheduler_state")
+                if scheduler_state and self.scheduler is not None:
+                    self.scheduler.load_state_dict(scheduler_state)
 
                 start_epoch = checkpoint.get("epoch", 0) + 1
                 run_id = checkpoint.get("run_id")
@@ -171,14 +187,13 @@ class BaseConsistencyModelTrainer(BaseTrainer):
             if self.scheduler is not None:
                 self.scheduler.step()
 
-            if self.tracker and self.tracker.logger:
-                self.tracker.logger.log_metrics(train_metrics, step=epoch)
-
             val_metrics = {}
             if val_loader:
                 val_metrics = self._validate(val_loader, epoch)
-                if self.tracker and self.tracker.logger:
-                    self.tracker.logger.log_metrics(val_metrics, step=epoch)
+
+            epoch_metrics = {**train_metrics, **val_metrics}
+            if self.tracker and self.tracker.logger:
+                self.tracker.logger.log_metrics(epoch_metrics, step=epoch)
 
             log_str = f"Epoch {epoch}/{epochs} | "
             log_str += " ".join([f"{k}: {v:.4f}" for k, v in train_metrics.items()])
@@ -198,5 +213,10 @@ class BaseConsistencyModelTrainer(BaseTrainer):
                     extra_state={
                         "ema_model_state": self.ema_model.state_dict(),
                         "target_model_state": self.target_model.state_dict(),
+                        "scheduler_state": self.scheduler.state_dict() if self.scheduler is not None else None,
                     },
                 )
+
+            if stop_fn and stop_fn(epoch_metrics):
+                print(f"Early stopping at epoch {epoch}.")
+                return

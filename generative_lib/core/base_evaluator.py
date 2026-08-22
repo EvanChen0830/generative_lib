@@ -10,7 +10,7 @@ class BaseEvaluator(ABC):
     def __init__(self, logger: Optional[Logger] = None):
         """
         Args:
-            logger: Optional Logger instance to log metrics to MLflow/Console.
+            logger: Optional Logger instance to log metrics to Weights & Biases/Console.
         """
         self.logger = logger
         

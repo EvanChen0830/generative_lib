@@ -57,7 +57,7 @@ class UnconditionalMLP(nn.Module):
 class ConditionalMLP(nn.Module):
     def __init__(self, data_dim=2, cond_dim=128, time_dim=128, hidden_dim=512):
         super().__init__()
-        self.cond_emb = nn.Embedding(3, cond_dim)
+        self.cond_emb = nn.Embedding(2, cond_dim)
         self.time_mlp = nn.Sequential(
             SinusoidalPosEmb(time_dim),
             nn.Linear(time_dim, hidden_dim),
@@ -77,8 +77,7 @@ class ConditionalMLP(nn.Module):
         if t.ndim == 2:
             t = t.squeeze(-1)
         t_emb = self.time_mlp(t.float())
-        cond_ids = condition.squeeze(-1).long()
-        cond_ids = torch.where(cond_ids < 0, torch.full_like(cond_ids, 2), cond_ids.clamp(0, 1))
+        cond_ids = condition.squeeze(-1).long().clamp(0, 1)
         cond_emb = self.cond_emb(cond_ids)
         return self.net(torch.cat([x, cond_emb, t_emb], dim=-1))
 
@@ -129,7 +128,7 @@ def build_parser():
     parser.add_argument("--ema-decay", type=float, default=0.9999)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--output-dir", type=Path, default=default_output_dir)
-    parser.add_argument("--mlflow-uri", type=str, default=None)
+    parser.add_argument("--wandb-mode", type=str, default=None)
     parser.add_argument("--run-name", type=str, default="Consistency_Pretrain_TwoMoons")
     parser.add_argument("--project-name", type=str, default="TwoMoons")
     parser.add_argument("--checkpoint-subdir", type=str, default="consistency_pretrain")
@@ -181,14 +180,13 @@ def main():
         sigma_max=args.sigma_max,
         sigma_data=args.sigma_data,
         target_ema_start=args.target_ema_start,
-        unconditional_value=args.unconditional_value,
     )
 
     logger = Logger(
         project_name=args.project_name,
         run_name=args.run_name,
-        use_mlflow=True,
-        mlflow_uri=args.mlflow_uri or f"file:{mlruns_dir}",
+        use_wandb=True,
+        wandb_mode=args.wandb_mode,
     )
     logger.log_params(
         {

@@ -76,10 +76,12 @@ def build_parser():
     parser.add_argument("--time-dim", type=int, default=128)
     parser.add_argument("--cond-dim", type=int, default=64)
     parser.add_argument("--guidance-scale", type=float, default=3.0)
+    parser.add_argument("--use-ema", action="store_true")
+    parser.add_argument("--ema-decay", type=float, default=0.999)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--output-dir", type=Path, default=default_output_dir)
-    parser.add_argument("--mlflow-uri", type=str, default=None)
+    parser.add_argument("--wandb-mode", type=str, default=None)
     parser.add_argument("--run-name", type=str, default="CFG_DDIM_Check")
     parser.add_argument("--project-name", type=str, default="TwoMoons")
     parser.add_argument("--checkpoint-subdir", type=str, default="cfg_diff")
@@ -137,8 +139,8 @@ def main():
     logger = Logger(
         project_name=args.project_name,
         run_name=args.run_name,
-        use_mlflow=True,
-        mlflow_uri=args.mlflow_uri or f"file:{mlruns_dir}",
+        use_wandb=True,
+        wandb_mode=args.wandb_mode,
     )
     logger.log_params(
         {
@@ -151,6 +153,8 @@ def main():
             "time_dim": args.time_dim,
             "cond_dim": args.cond_dim,
             "guidance_scale": args.guidance_scale,
+            "use_ema": args.use_ema,
+            "ema_decay": args.ema_decay,
             "seed": args.seed,
             "device": device,
             "method": args.method,
@@ -179,6 +183,8 @@ def main():
         label_keys=["position"],
         device=device,
         tracker=tracker,
+        use_ema=args.use_ema,
+        ema_decay=args.ema_decay,
     )
 
     print(train_label)
@@ -190,12 +196,12 @@ def main():
     cond = torch.cat([cond_0, cond_1], dim=0)
 
     sampler_ddpm = BaseDiffusionSampler(
-        method, model, device, steps=args.sampler_steps, sampler_type="ddpm", guidance_scale=1.0, feature_keys=["class"]
+        method, trainer.get_sampling_model(), device, steps=args.sampler_steps, sampler_type="ddpm", guidance_scale=1.0, feature_keys=["class"]
     )
     s_ddpm = sampler_ddpm.sample(num_samples=1, shape=[2], condition=cond).squeeze(1).detach().cpu().numpy()
 
     sampler_ddim = BaseDiffusionSampler(
-        method, model, device, steps=args.sampler_steps, sampler_type="ddim", guidance_scale=1.0, feature_keys=["class"]
+        method, trainer.get_sampling_model(), device, steps=args.sampler_steps, sampler_type="ddim", guidance_scale=1.0, feature_keys=["class"]
     )
     s_ddim = sampler_ddim.sample(num_samples=1, shape=[2], condition=cond).squeeze(1).detach().cpu().numpy()
 
@@ -225,7 +231,7 @@ def main():
     if args.method == "cfg":
         sampler_cfg = BaseDiffusionSampler(
             method,
-            model,
+            trainer.get_sampling_model(),
             device,
             steps=args.sampler_steps,
             sampler_type="ddim",

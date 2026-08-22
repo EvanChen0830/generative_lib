@@ -9,7 +9,7 @@ setup(
     install_requires=[
         "torch>=2.0.0",
         "numpy",
-        "mlflow",
+        "wandb",
         "tqdm",  # For progress bars in trainers
     ],
     extras_require={

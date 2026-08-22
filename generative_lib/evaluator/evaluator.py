@@ -14,7 +14,7 @@ class Evaluator(BaseEvaluator):
         Args:
             feature_key: Key to extract real data from dataloader batches. 
                          Example: "position" for Two Moons.
-            logger: MLflow logger instance.
+            logger: Weights & Biases logger instance.
         """
         super().__init__(logger)
         self.feature_key = feature_key
@@ -76,7 +76,7 @@ class Evaluator(BaseEvaluator):
         
         metrics = {"fid": float(fid)}
         
-        # Log to MLflow
+        # Log to Weights & Biases
         if self.logger:
             self.logger.log_metrics(metrics, step=step)
             print(f"Evaluator Metrics Logged: {metrics}")

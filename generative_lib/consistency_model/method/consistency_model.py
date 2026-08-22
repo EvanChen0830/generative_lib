@@ -8,7 +8,7 @@ from ...core.base_method import BaseMethod
 
 
 class ConsistencyModel(BaseMethod):
-    """Consistency Model with a target teacher and EMA eval model support."""
+    """Consistency Model trained against an exponential-moving-average teacher."""
 
     def __init__(
         self,
@@ -20,9 +20,8 @@ class ConsistencyModel(BaseMethod):
         min_scales: int = 2,
         target_ema_start: float = 0.95,
         use_log_noise_conditioning: bool = True,
-        unconditional_value: float = -1.0,
-        cond_weight: float = 1.0,
-        uncond_weight: float = 1.0,
+        use_scale_schedule: bool = True,
+        use_ema_schedule: bool = True,
     ):
         super().__init__()
         self.sigma_min = sigma_min
@@ -33,9 +32,8 @@ class ConsistencyModel(BaseMethod):
         self.min_scales = min_scales
         self.target_ema_start = target_ema_start
         self.use_log_noise_conditioning = use_log_noise_conditioning
-        self.unconditional_value = unconditional_value
-        self.cond_weight = cond_weight
-        self.uncond_weight = uncond_weight
+        self.use_scale_schedule = use_scale_schedule
+        self.use_ema_schedule = use_ema_schedule
         self.current_train_step = 0
         self.total_train_steps = 1
 
@@ -54,7 +52,7 @@ class ConsistencyModel(BaseMethod):
         max_inv_rho = self.sigma_max ** (1 / self.rho)
         return (max_inv_rho + ramp * (min_inv_rho - max_inv_rho)) ** self.rho
 
-    def sample_seq_sigmas(self, n: int, device: torch.device, schedule: str = "linear") -> torch.Tensor:
+    def sample_seq_sigmas(self, n: int, device: torch.device, schedule: str = "karras") -> torch.Tensor:
         if schedule == "karras":
             sigmas = self._build_karras_sigmas(n, device)
         elif schedule == "linear":
@@ -63,15 +61,21 @@ class ConsistencyModel(BaseMethod):
             sigmas = torch.linspace(math.log(self.sigma_max), math.log(self.sigma_min), n, device=device).exp()
         else:
             raise ValueError(f"Unknown consistency schedule: {schedule}")
-        return torch.cat([sigmas, sigmas.new_zeros(1)], dim=0)
+        return sigmas
 
     def current_num_scales(self) -> int:
+        """Returns the active number of noise levels for CT."""
+        if not self.use_scale_schedule:
+            return self.num_scales
         progress = self.current_train_step / max(self.total_train_steps, 1)
         max_term = (self.num_scales + 1) ** 2 - self.min_scales**2
         scales = math.ceil(math.sqrt(progress * max_term + self.min_scales**2) - 1)
         return max(scales + 1, 2)
 
     def compute_target_ema_rate(self) -> float:
+        """Returns the target-teacher EMA decay for the current CT step."""
+        if not self.use_ema_schedule:
+            return self.target_ema_start
         current_scales = self.current_num_scales()
         c = -math.log(self.target_ema_start) * self.min_scales
         return math.exp(-c / max(current_scales, 1e-12))
@@ -128,9 +132,68 @@ class ConsistencyModel(BaseMethod):
         x: torch.Tensor,
         condition: Optional[torch.Tensor] = None,
         teacher_model: Optional[nn.Module] = None,
-        ema_model: Optional[nn.Module] = None,
     ) -> Dict[str, torch.Tensor]:
-        del ema_model
+        """Computes the appropriate consistency-training objective.
+
+        Args:
+            model: Online consistency model.
+            x: Clean training batch.
+            condition: Optional batch-aligned conditioning tensor.
+            teacher_model: EMA target teacher. Defaults to ``model``.
+
+        Returns:
+            The scalar consistency loss.
+        """
+        if condition is None:
+            return self.compute_unconditional_loss(model, x, teacher_model)
+        return self.compute_conditional_loss(model, x, condition, teacher_model)
+
+    def compute_unconditional_loss(
+        self,
+        model: nn.Module,
+        x: torch.Tensor,
+        teacher_model: Optional[nn.Module] = None,
+    ) -> Dict[str, torch.Tensor]:
+        """Computes CT loss for an unconditional model.
+
+        Args:
+            model: Online consistency model.
+            x: Clean training batch.
+            teacher_model: EMA target teacher. Defaults to ``model``.
+
+        Returns:
+            The scalar consistency loss.
+        """
+        return self._compute_consistency_loss(model, x, None, teacher_model)
+
+    def compute_conditional_loss(
+        self,
+        model: nn.Module,
+        x: torch.Tensor,
+        condition: torch.Tensor,
+        teacher_model: Optional[nn.Module] = None,
+    ) -> Dict[str, torch.Tensor]:
+        """Computes CT loss for a conditional model.
+
+        Args:
+            model: Online consistency model.
+            x: Clean training batch.
+            condition: Batch-aligned conditioning tensor.
+            teacher_model: EMA target teacher. Defaults to ``model``.
+
+        Returns:
+            The scalar consistency loss.
+        """
+        return self._compute_consistency_loss(model, x, condition, teacher_model)
+
+    def _compute_consistency_loss(
+        self,
+        model: nn.Module,
+        x: torch.Tensor,
+        condition: Optional[torch.Tensor],
+        teacher_model: Optional[nn.Module],
+    ) -> Dict[str, torch.Tensor]:
+        """Computes CT on adjacent Karras noise levels."""
         batch_size = x.shape[0]
         device = x.device
         teacher = teacher_model if teacher_model is not None else model
@@ -145,24 +208,11 @@ class ConsistencyModel(BaseMethod):
         x_student = x + noise * self._append_dims(t_student, x.ndim)
         x_teacher = x + noise * self._append_dims(t_teacher, x.ndim)
 
-        def branch_loss(branch_condition: Optional[torch.Tensor]) -> torch.Tensor:
-            pred_student = self.predict(model, x_student, t_student, branch_condition)
-            with torch.no_grad():
-                pred_teacher = self.predict(teacher, x_teacher, t_teacher, branch_condition)
-            return torch.nn.functional.mse_loss(pred_student, pred_teacher)
-
-        cond_loss = branch_loss(condition)
-        if condition is None:
-            return {"loss": cond_loss, "cond_loss": cond_loss}
-
-        uncond_condition = torch.full_like(condition, self.unconditional_value)
-        uncond_loss = branch_loss(uncond_condition)
-        total_loss = self.cond_weight * cond_loss + self.uncond_weight * uncond_loss
-        return {
-            "loss": total_loss,
-            "cond_loss": cond_loss,
-            "uncond_loss": uncond_loss,
-        }
+        pred_student = self.predict(model, x_student, t_student, condition)
+        with torch.no_grad():
+            pred_teacher = self.predict(teacher, x_teacher, t_teacher, condition)
+        consistency_loss = torch.nn.functional.mse_loss(pred_student, pred_teacher)
+        return {"loss": consistency_loss, "consistency_loss": consistency_loss}
 
     def predict(
         self,

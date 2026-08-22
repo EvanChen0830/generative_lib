@@ -8,7 +8,7 @@
   - [x] Standalone `Evaluator(logger=...)`.
   - [x] Interface `evaluate(generated_data, dataloader)`.
   - [x] FID Metric Logic.
-  - [x] MLflow Integration.
+  - [x] Weights & Biases Integration.
 
 ## 🚀 Priority 2: Advanced Sampling & Guidance
 

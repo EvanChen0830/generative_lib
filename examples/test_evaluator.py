@@ -77,7 +77,7 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     method = GaussianDiffusion(timesteps=1000, schedule="linear")
     
-    logger = Logger(project_name="EvalTest", run_name="FID_ReCheck", use_mlflow=True, mlflow_uri=f"file:{output_dir / 'mlruns'}")
+    logger = Logger(project_name="EvalTest", run_name="FID_ReCheck", use_wandb=True, wandb_mode="offline")
     tracker = ModelTracker(exp_name="EvalTest", model_name="Diff", save_dir=str(output_dir / "checkpoints" / "eval_test"), logger=logger)
     
     trainer = BaseDiffusionTrainer(

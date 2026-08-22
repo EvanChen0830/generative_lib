@@ -55,7 +55,7 @@ generative_lib/
 ├── utils/
 │   ├── __init__.py
 │   ├── tracker.py           # ModelTracker (Best/Last/Resume)
-│   ├── logger.py            # Logger (MLflow/Tensorboard wrapper)
+│   ├── logger.py            # Logger (Weights & Biases/Tensorboard wrapper)
 ├── metrics/
 │   ├── __init__.py
 │   ├── dist_metrics.py      # DistributionMetrics
@@ -79,8 +79,8 @@ from generative_lib.metrics.dist_metrics import DistributionMetrics
 
 # 1. Infrastructure Setup
 
-logger = Logger(project_name="HFT_Gen", run_name="Exp_001", mlflow = True, dir = "./logs")
-# here if the logger enable mlflow, the tracker will load the metrics and all the other stuff onto mlflow
+logger = Logger(project_name="HFT_Gen", run_name="Exp_001", W&B = True, dir = "./logs")
+# here if the logger enable W&B, the tracker will load the metrics and all the other stuff onto W&B
 tracker = ModelTracker(
     exp_name="Exp_001",
     model_name="DiT_Small",
@@ -234,7 +234,7 @@ The Sampler aggregates results across the entire dataset.
 #### `Logger`
 
 - **Methods:** `log_metrics(dict, step)`, `log_params(dict)`.
-- **Backend:** Wraps MLflow or Tensorboard.
+- **Backend:** Wraps Weights & Biases or Tensorboard.
 
 #### `ModelTracker`
 

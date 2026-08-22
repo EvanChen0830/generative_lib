@@ -1,15 +1,14 @@
+import argparse
 import torch
 import torch.nn as nn
-import numpy as np
 from sklearn.datasets import make_moons
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 from pathlib import Path
 
 from generative_lib.flow_matching.method.flow_matching import FlowMatching
 from generative_lib.flow_matching.trainer.base import BaseFlowMatchingTrainer
 from generative_lib.flow_matching.sampler.base import BaseFlowMatchingSampler
-from generative_lib.utils.logger import Logger
 from generative_lib.metrics.distance import calculate_frechet_distance, compute_statistics
 
 class SimpleMLP(nn.Module):
@@ -31,22 +30,40 @@ class SimpleMLP(nn.Module):
         inp = torch.cat([x, t], dim=-1)
         return self.net(inp)
 
+
+def build_parser() -> argparse.ArgumentParser:
+    """Builds the flow-matching example command-line parser."""
+    parser = argparse.ArgumentParser(description="Two-moons flow-matching example")
+    parser.add_argument("--use-ema", action="store_true")
+    parser.add_argument("--ema-decay", type=float, default=0.999)
+    parser.add_argument("--epochs", type=int, default=200)
+    parser.add_argument("--train-size", type=int, default=20000)
+    parser.add_argument("--batch-size", type=int, default=256)
+    parser.add_argument("--hidden-dim", type=int, default=64)
+    parser.add_argument("--sample-steps", type=int, default=50)
+    parser.add_argument("--num-samples", type=int, default=500)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--output-dir", type=Path, default=None)
+    return parser
+
 def main():
+    args = build_parser().parse_args()
+    torch.manual_seed(args.seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    output_dir = Path(__file__).resolve().parent.parent / "runs" / "examples" / "two_moons_flow"
+    output_dir = args.output_dir or Path(__file__).resolve().parent.parent / "runs" / "examples" / "two_moons_flow"
     output_dir.mkdir(parents=True, exist_ok=True)
     figure_path = output_dir / "two_moons_flow.png"
     
     # 2. Prepare Data
-    X, _ = make_moons(n_samples=20000, noise=0.05)
+    X, _ = make_moons(n_samples=args.train_size, noise=0.05, random_state=args.seed)
     train_loader = DataLoader(
         [{"features": x} for x in torch.from_numpy(X).float()], 
-        batch_size=256, 
+        batch_size=args.batch_size,
         shuffle=True
     )
     
     # 3. Setup Components
-    model = SimpleMLP().to(device)
+    model = SimpleMLP(hidden_features=args.hidden_dim).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     
     method = FlowMatching(sigma_min=0.0)
@@ -57,23 +74,25 @@ def main():
         optimizer=optimizer,
         feature_keys=[],
         label_keys=["features"], 
-        device=device
+        device=device,
+        use_ema=args.use_ema,
+        ema_decay=args.ema_decay,
     )
     
     # 4. Train
-    print("Training Flow Matching (20k samples, 200 epochs)...")
-    trainer.fit(train_loader, epochs=200)
+    print(f"Training Flow Matching ({args.train_size} samples, {args.epochs} epochs)...")
+    trainer.fit(train_loader, epochs=args.epochs)
     
     # 5. Sample
     print("Sampling...")
-    sampler = BaseFlowMatchingSampler(method, model, device, steps=50)
+    sampler = BaseFlowMatchingSampler(method, trainer.get_sampling_model(), device, steps=args.sample_steps)
     
     # Unconditional sampling check (or dummy conditional since we didn't train robustly on Cond for Flow yet?)
     # Wait, the Flow Trainer example above was UNCONDITIONAL (label_keys=[]).
     # X, _ = make_moons. Labels usage was implicit or ignored in training?
     # In two_moons_flow.py (Step 96), `label_keys=[]`. So it's unconditional.
     # So sample(num_samples=500) works as batch size.
-    samples = sampler.sample(num_samples=500, shape=[2])
+    samples = sampler.sample(num_samples=args.num_samples, shape=[2])
     # Returns [500, 2] because B=1.
     
     # 6. Verify

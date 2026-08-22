@@ -46,6 +46,9 @@ class UnconditionalMLP(nn.Module):
             nn.Linear(hidden_dim, hidden_dim),
             nn.BatchNorm1d(hidden_dim),
             nn.SiLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.BatchNorm1d(hidden_dim),
+            nn.SiLU(),
             nn.Linear(hidden_dim, data_dim),
         )
 
@@ -59,7 +62,7 @@ class UnconditionalMLP(nn.Module):
 class ConditionalMLP(nn.Module):
     def __init__(self, data_dim=2, cond_dim=128, time_dim=192, hidden_dim=768):
         super().__init__()
-        self.cond_emb = nn.Embedding(3, cond_dim)
+        self.cond_emb = nn.Embedding(2, cond_dim)
         self.time_mlp = nn.Sequential(
             SinusoidalPosEmb(time_dim),
             nn.Linear(time_dim, hidden_dim),
@@ -82,8 +85,7 @@ class ConditionalMLP(nn.Module):
         if t.ndim == 2:
             t = t.squeeze(-1)
         t_emb = self.time_mlp(t.float())
-        cond_ids = condition.squeeze(-1).long()
-        cond_ids = torch.where(cond_ids < 0, torch.full_like(cond_ids, 2), cond_ids.clamp(0, 1))
+        cond_ids = condition.squeeze(-1).long().clamp(0, 1)
         cond_emb = self.cond_emb(cond_ids)
         return self.net(torch.cat([x, cond_emb, t_emb], dim=-1))
 
@@ -91,10 +93,10 @@ class ConditionalMLP(nn.Module):
 def build_parser():
     repo_root = Path(__file__).resolve().parent.parent
     default_output_dir = repo_root / "runs" / "examples" / "two_moons_consistency"
-    parser = argparse.ArgumentParser(description="Conditional two-moons consistency model example")
+    parser = argparse.ArgumentParser(description="Two-moons consistency model example")
     parser.add_argument("--mode", choices=["conditional", "unconditional"], default="conditional")
     parser.add_argument("--epochs", type=int, default=400)
-    parser.add_argument("--pretrain-epochs", type=int, default=0)
+    parser.add_argument("--pretrain-epochs", type=int, default=100)
     parser.add_argument("--num-samples", type=int, default=250)
     parser.add_argument("--train-size", type=int, default=20000)
     parser.add_argument("--batch-size", type=int, default=256)
@@ -103,22 +105,23 @@ def build_parser():
     parser.add_argument("--cond-dim", type=int, default=128)
     parser.add_argument("--num-scales", type=int, default=120)
     parser.add_argument("--min-scales", type=int, default=2)
-    parser.add_argument("--sample-steps", type=int, default=2)
+    parser.add_argument("--sample-steps", type=int, default=8)
     parser.add_argument("--sigma-min", type=float, default=0.05)
     parser.add_argument("--sigma-max", type=float, default=1.0)
     parser.add_argument("--sigma-data", type=float, default=0.5)
-    parser.add_argument("--target-ema-start", type=float, default=0.95)
-    parser.add_argument("--unconditional-value", type=float, default=-1.0)
-    parser.add_argument("--guidance-scale", type=float, default=1.5)
-    parser.add_argument("--cond-weight", type=float, default=1.0)
-    parser.add_argument("--uncond-weight", type=float, default=1.0)
+    parser.add_argument("--target-ema-start", type=float, default=0.99)
+    parser.add_argument(
+        "--use-ct-schedules",
+        action="store_true",
+        help="Use the progressive N(k) and target-EMA schedules for training from scratch.",
+    )
     parser.add_argument("--lr", type=float, default=5e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--ema-decay", type=float, default=0.9999)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--output-dir", type=Path, default=default_output_dir)
-    parser.add_argument("--mlflow-uri", type=str, default=None)
+    parser.add_argument("--wandb-mode", type=str, default=None)
     parser.add_argument("--run-name", type=str, default="Consistency_TwoMoons")
     parser.add_argument("--project-name", type=str, default="TwoMoons")
     parser.add_argument("--checkpoint-subdir", type=str, default="consistency")
@@ -134,7 +137,6 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     output_dir = args.output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
-    mlruns_dir = output_dir / "mlruns"
     checkpoint_dir = output_dir / "checkpoints" / args.checkpoint_subdir
     suffix = "cond" if args.mode == "conditional" else "uncond"
     figure_path = output_dir / f"two_moons_consistency_{suffix}_comparison.png"
@@ -179,16 +181,15 @@ def main():
         sigma_max=args.sigma_max,
         sigma_data=args.sigma_data,
         target_ema_start=args.target_ema_start,
-        unconditional_value=args.unconditional_value,
-        cond_weight=args.cond_weight,
-        uncond_weight=args.uncond_weight,
+        use_scale_schedule=args.use_ct_schedules,
+        use_ema_schedule=args.use_ct_schedules,
     )
 
     logger = Logger(
         project_name=args.project_name,
         run_name=args.run_name,
-        use_mlflow=True,
-        mlflow_uri=args.mlflow_uri or f"file:{mlruns_dir}",
+        use_wandb=True,
+        wandb_mode=args.wandb_mode,
     )
     logger.log_params(
         {
@@ -208,10 +209,7 @@ def main():
             "sigma_max": args.sigma_max,
             "sigma_data": args.sigma_data,
             "target_ema_start": args.target_ema_start,
-            "unconditional_value": args.unconditional_value,
-            "guidance_scale": args.guidance_scale,
-            "cond_weight": args.cond_weight,
-            "uncond_weight": args.uncond_weight,
+            "use_ct_schedules": args.use_ct_schedules,
             "lr": args.lr,
             "weight_decay": args.weight_decay,
             "ema_decay": args.ema_decay,
@@ -242,33 +240,33 @@ def main():
     )
 
     print(f"Training {args.mode.title()} Consistency Model...")
-    if args.pretrain_epochs > 0:
+    if args.pretrain_epochs > 0 and not args.resume:
         print("Running diffusion pretraining...")
         trainer.pretrain_diffusion(train_loader, epochs=args.pretrain_epochs)
+    elif args.pretrain_epochs > 0:
+        print("Skipping diffusion pretraining because --resume restores the saved CT state.")
     trainer.fit(train_loader, epochs=args.epochs, resume=args.resume)
 
     print("Sampling Comparison...")
     sampler = BaseConsistencyModelSampler(
         method,
-        trainer.ema_model,
+        trainer.get_sampling_model(),
         device,
         steps=args.sample_steps,
         feature_keys=feature_keys,
-        guidance_scale=args.guidance_scale,
-        unconditional_value=args.unconditional_value,
     )
     if args.mode == "conditional":
         cond_0 = torch.zeros(1, 1)
         cond_1 = torch.ones(1, 1)
-        samples_0 = sampler.sample(num_samples=args.num_samples, shape=[2], condition=cond_0).squeeze(0).detach().cpu().numpy()
-        samples_1 = sampler.sample(num_samples=args.num_samples, shape=[2], condition=cond_1).squeeze(0).detach().cpu().numpy()
+        samples_0 = sampler.sample_conditional(args.num_samples, [2], cond_0).squeeze(0).detach().cpu().numpy()
+        samples_1 = sampler.sample_conditional(args.num_samples, [2], cond_1).squeeze(0).detach().cpu().numpy()
         samples = np.concatenate([samples_0, samples_1], axis=0)
         labels = np.concatenate(
             [np.zeros((args.num_samples, 1), dtype=np.float32), np.ones((args.num_samples, 1), dtype=np.float32)],
             axis=0,
         )
     else:
-        samples = sampler.sample(num_samples=args.num_samples * 2, shape=[2]).detach().cpu().numpy()
+        samples = sampler.sample_unconditional(args.num_samples * 2, [2]).detach().cpu().numpy()
         labels = None
 
     print("Computing metrics...")
@@ -301,7 +299,6 @@ def main():
         "Method: consistency_model",
         f"Mode: {args.mode}",
         f"FD Consistency: {fd_val:.4f}",
-        f"Guidance Scale: {args.guidance_scale}",
         f"Figure: {figure_path}",
         f"Samples: {samples_path}",
     ]
