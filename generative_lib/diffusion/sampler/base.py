@@ -96,13 +96,16 @@ class BaseDiffusionSampler(BaseSampler):
         batch_shape = (current_batch_size, *shape)
         x_t = torch.randn(batch_shape, device=self.device)
         
-        time_seq = list(reversed(range(0, self.method.timesteps, self.method.timesteps // self.steps)))
-        time_seq = time_seq[:self.steps]
+        # ``GaussianDiffusion.compute_loss`` trains the denoiser with integer
+        # indices in [0, T).  Use the same representation at inference and
+        # include T - 1, whose cosine-schedule state is the terminal noise.
+        time_seq = torch.linspace(
+            self.method.timesteps - 1, 0, self.steps, device=self.device
+        ).round().long().tolist()
         
         # Nested TQDM for time steps
         for i, t_idx in enumerate(tqdm(time_seq, desc="Diffusion Steps", leave=False)):
-            prev_t_idx = t_idx - (self.method.timesteps // self.steps)
-            if prev_t_idx < 0: prev_t_idx = -1 
+            prev_t_idx = time_seq[i + 1] if i + 1 < len(time_seq) else -1
             
             def get_alpha_bar(idx):
                 if idx < 0: return torch.tensor(1.0).to(self.device).view(1, *([1]*len(shape)))
@@ -112,7 +115,9 @@ class BaseDiffusionSampler(BaseSampler):
             alpha_bar_t = get_alpha_bar(t_idx)
             alpha_bar_prev = get_alpha_bar(prev_t_idx)
             
-            t_float = t_idx / self.method.timesteps
+            t_idx_tensor = torch.full(
+                (x_t.shape[0],), t_idx, device=self.device, dtype=torch.long
+            )
             
             # Predict Noise
             if self.guidance_scale != 1.0 and condition is not None:
@@ -122,21 +127,22 @@ class BaseDiffusionSampler(BaseSampler):
                 # Let's do concatenation.
                 
                 x_in = torch.cat([x_t, x_t], dim=0)
-                # t_float is scalar, method.predict handles broadcasting
-                
                 # Create Unconditional Condition
                 uncond = torch.full_like(condition, self.unconditional_value)
                 c_in = torch.cat([condition, uncond], dim=0)
                 
                 # Predict
-                noise_pred_all = self.method.predict(self.model, x_in, t_float, c_in)
+                t_cfg = torch.full(
+                    (x_in.shape[0],), t_idx, device=self.device, dtype=torch.long
+                )
+                noise_pred_all = self.method.predict(self.model, x_in, t_cfg, c_in)
                 eps_cond, eps_uncond = torch.chunk(noise_pred_all, 2, dim=0)
                 
                 pred_noise = eps_uncond + self.guidance_scale * (eps_cond - eps_uncond)
                 
             else:
                 # Standard
-                pred_noise = self.method.predict(self.model, x_t, t_float, condition)
+                pred_noise = self.method.predict(self.model, x_t, t_idx_tensor, condition)
 
             # Update Step
             if self.sampler_type == "ddim":
